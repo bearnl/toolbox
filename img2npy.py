@@ -1,0 +1,48 @@
+import sys
+import argparse
+from os import listdir
+from os.path import isfile, join
+import site
+site.addsitedir('D:\\Program Files\\opencv-4.3.0-dldt-2020.2-vc16-avx2\\opencv\\build\\python')
+import cv2
+import numpy as np
+
+
+def read_images(path, mode=cv2.IMREAD_COLOR, resize=None):
+  img_list = []
+  for f in listdir(path):
+    if not isfile(join(path, f)):
+      continue
+    print('reading', path, f)
+    img = cv2.imread('%s/%s' % (path, f), mode)
+    if resize is not None:
+      tmp = resize.split('x')
+      img = cv2.resize(img, (int(tmp[1]), int(tmp[0])), interpolation=cv2.INTER_AREA)
+    img_list.append(img)
+  return np.array(img_list)
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser(description='Convert images to npy')
+  parser.add_argument('input_path', action='store', help='the directory continas the images')
+  parser.add_argument('output_path', action='store', help='path to the npy file')
+  parser.add_argument('--mode', choices=['anydepth', 'color', 'grayscale'],
+    help='specify image type', default='color')
+  parser.add_argument('--resize', help='downsample image size, e.g. 128x256', default=None)
+  args = parser.parse_args()
+
+  path = args.input_path
+  npy_filename = args.output_path
+  mode = cv2.IMREAD_COLOR
+  if args.mode == 'anydepth':
+    mode = cv2.IMREAD_ANYDEPTH
+  elif args.mode == 'color':
+    mode = cv2.IMREAD_COLOR
+  elif args.mode == 'grayscale':
+    mode = cv2.IMREAD_GRAYSCALE
+
+  arr = read_images(path, mode, args.resize)
+  print('reading complete. lines=', len(arr), 'saving...')
+  print('total matrix size', arr.shape, 'type', arr.dtype)
+  np.save(npy_filename, arr)
+  print('done')
