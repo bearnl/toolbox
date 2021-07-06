@@ -3,7 +3,7 @@ import argparse
 from os import listdir
 from os.path import isfile, join
 import site
-site.addsitedir('D:\\Program Files\\opencv-4.3.0-dldt-2020.2-vc16-avx2\\opencv\\build\\python')
+site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
 import cv2
 import numpy as np
 
