@@ -46,7 +46,7 @@ def clustering(img: np.ndarray, idx: List[int],
 			print('cluster', i, 'larger than', size_max, ', skipped')
 			continue
 		elif size_min is not None and stats[i] < size_min:
-			print('cluster is smaller than', size_min, '. searching completed with nothing found')
+			print('cluster is smaller than', size_min, '. searching completed')
 			break
 		elif centroid_exclude[0] < centroids[i][0] < centroid_exclude[2] \
 			and centroid_exclude[1] < centroids[i][1] < centroid_exclude[3]:
@@ -93,6 +93,7 @@ if __name__ == '__main__':
 	parser.add_argument('--range-high', type=int)
 	parser.add_argument('--bg-dataset', type=Path)
 	parser.add_argument('--bg-threshold', type=int, default=100)
+	parser.add_argument('--bg-median', action='store_true', help='Use median filter')
 	parser.add_argument('--cluster-size-min', type=int)
 	parser.add_argument('--cluster-size-max', type=int)
 	parser.add_argument('--cluster-idx', type=str)
@@ -100,6 +101,8 @@ if __name__ == '__main__':
 	parser.add_argument('--preview', action='store_true')
 	parser.add_argument('--preview-timeout', type=int, default=0)
 	parser.add_argument('--dump-original', type=str)
+	parser.add_argument('--dump-raw-depth', type=str)
+	parser.add_argument('--no-skip-empty-image', action='store_true')
 	group = parser.add_argument_group()
 	group_numpy = group.add_argument_group()
 	group_numpy.add_argument('--colour-dataset', type=Path)
@@ -130,7 +133,10 @@ if __name__ == '__main__':
 			parser.error('bg dataset can only be a .npy file')
 		else:
 			print('loading bg dataset')
-			bg_img = np.mean(np.load(str(bg_dataset)), axis=0).astype(np.uint16)
+			if not args.bg_median:
+				bg_img = np.mean(np.load(str(bg_dataset)), axis=0).astype(np.uint16)
+			else:
+				bg_img = np.median(np.load(str(bg_dataset)), axis=0).astype(np.uint16)
 			print('bg dataset loaded')
 
 	print('arguments:', vars(args))
@@ -155,6 +161,9 @@ if __name__ == '__main__':
 	dump_original: str = args.dump_original
 	if dump_original:
 		output_original = []
+	dump_raw_depth: str = args.dump_raw_depth
+	if dump_raw_depth:
+		output_raw_depth = []
 
 	for depth, colour, colour_trans in img_iter:
 		if colour is not None and colour.shape[2] == 3:
@@ -163,6 +172,8 @@ if __name__ == '__main__':
 		if colour_trans is None:
 			print('no colour_trans image found, use colour image instead')
 			colour_trans = colour
+
+		raw_depth = depth
 		if preview:
 			img_preview = cv2.cvtColor(
 				cv2.normalize(depth, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_8UC1),
@@ -216,17 +227,24 @@ if __name__ == '__main__':
 			img_preview = np.concatenate(
 					(img_preview, final), axis=1)
 
+		empty_img = not np.any(depth)
 		if preview:
 			cv2.imshow('preview', img_preview)
-			if cv2.waitKey(args.preview_timeout) == ord('q'):
+			if not args.no_skip_empty_image and empty_img:
+				k_timeout = 1
+			else:
+				k_timeout = args.preview_timeout
+			if cv2.waitKey(k_timeout) == ord('q'):
 				break
 
-		if not np.any(depth):
+		if empty_img:
 			print('img is empty, skipped')
 			continue
 
 		if dump_original:
 			output_original.append(colour_trans)
+		if dump_raw_depth:
+			output_raw_depth.append(raw_depth)
 		output_dataset.append(final)
 
 print('saving...')
@@ -236,4 +254,7 @@ np.save(output_path, out)
 if dump_original:
 	origial: np.ndarray = np.asarray(output_original)
 	np.save(dump_original, origial)
+if dump_raw_depth:
+	raw_depth: np.ndarray = np.asarray(output_raw_depth)
+	np.save(dump_raw_depth, raw_depth)
 print('done')
