@@ -1,13 +1,17 @@
 import site
-site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
 import os
-os.add_dll_directory('C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin')
-import segment_k4a
 from typing import List, Tuple
-import cv2
-import numpy as np
 import argparse
 from pathlib import Path
+import numpy as np
+
+os.add_dll_directory('C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin')
+import segment_k4a
+try:
+	import cv2
+except ImportError:
+	site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
+import cv2
 
 # python .\segment.py --preview --bg-dataset .\mar-22-bear-dk-1-bg.npy .\rawdata\mycapture\mar-22-bear-dk-1.mkv mar-22-bear-dk-1-sliced.npy --cluster-idx 0 --cluster-size-min 30000 --range-low 100 --range-high 2500
 
