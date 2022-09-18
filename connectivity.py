@@ -36,7 +36,9 @@ def clustering(img, tolerance=255, background=0):
     for child, parent in equivalence.items():
         labels[labels == child] = parent
 
-    return labels
+    centroids = [np.argwhere(labels==label).sum(0)/count for label, count in np.column_stack(np.unique(labels, return_counts=True))]
+
+    return labels, centroids
 
 if __name__ == '__main__':
     test_img = np.array([
