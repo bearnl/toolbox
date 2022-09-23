@@ -3,15 +3,26 @@ import argparse
 from os import listdir
 from os.path import isfile, join
 import site
-site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
-import cv2
+try:
+  import cv2
+except ImportError:
+  site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
+  import cv2
 import numpy as np
+import pathlib
 
 
-def read_images(path, mode=cv2.IMREAD_COLOR, resize=None):
+def read_images(path, mode=cv2.IMREAD_COLOR, resize=None, multicam=None):
+  base_path = pathlib.Path(path)
   img_list = []
   for f in listdir(path):
-    if not isfile(join(path, f)):
+    name = base_path / f
+    if multicam:
+      name_tmp = name.stem.split('_')
+      if name_tmp.pop() != multicam:
+        continue
+      name = base_path / ('_'.join(name_tmp) + name.suffix)
+    if not isfile(name):
       continue
     print('reading', path, f)
     img = cv2.imread('%s/%s' % (path, f), mode)
