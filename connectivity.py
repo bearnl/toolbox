@@ -1,12 +1,12 @@
 import numpy as np
 
 
-def clustering(img, tolerance=255, background=0):
+def clustering(img, tolerance=0, background=0):
     """Two-pass clustering algorithm.
     img: 2D numpy array
     tolerance: maximum difference between two pixels to be considered
     """
-    labels = np.zeros(img.shape, dtype=np.int8)
+    labels = np.zeros(img.shape, dtype=np.int32)
     current_label = 1
     equivalence = {}
 
@@ -17,9 +17,9 @@ def clustering(img, tolerance=255, background=0):
                 continue
             # Check if it's connected to a previous label
             neighbors = []
-            if row > 0 and img[row - 1, col] != background and abs(img[row, col] - img[row - 1, col]) <= tolerance:
+            if row > 0 and img[row - 1, col] != background and abs(np.int32(img[row, col]) - img[row - 1, col]) <= tolerance:
                 neighbors.append(labels[row - 1, col])
-            if col > 0 and img[row, col - 1] != background and abs(img[row, col] - img[row, col - 1]) <= tolerance:
+            if col > 0 and img[row, col - 1] != background and abs(np.int32(img[row, col]) - img[row, col - 1]) <= tolerance:
                 neighbors.append(labels[row, col - 1])
             if len(neighbors) == 0:
                 # No neighbors, new label

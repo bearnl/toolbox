@@ -1,10 +1,11 @@
 import site
-site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
-import os
-os.add_dll_directory('C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin')
+try:
+	import cv2
+except ImportError:
+	site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
+import cv2
 import argparse
 from pathlib import Path
-import cv2
 import numpy as np
 
 

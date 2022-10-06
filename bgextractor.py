@@ -1,12 +1,22 @@
 import site
-site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
 import os
-os.add_dll_directory('C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin')
+try:
+	import cv2
+except ImportError:
+	site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
+import cv2
+
+try:
+	os.add_dll_directory('C:\\Program Files\\Azure Kinect SDK v1.4.1\\sdk\\windows-desktop\\amd64\\release\\bin')
+	import segment_k4a
+except FileNotFoundError:
+	print('Azure Kinect SDK DLL not found')
+except ImportError:
+	print('Unable to import segment_k4a')
 import argparse
 from pathlib import Path
-import segment_k4a
-import cv2
 import numpy as np
+from common import get_images_from_recording, get_images_from_datasets
 
 
 if __name__ == '__main__':
@@ -17,35 +27,36 @@ if __name__ == '__main__':
 
 	input_path: Path = args.input[0]
 	if input_path.is_dir():
-		parser.error('input can only be a recording file')
+		parser.error('input can only be a recording file or numpy file')
 
 	output_path: Path = args.output[0]
 	if output_path.is_dir():
 		parser.error('output can only be a .npy file')
 
-	ctx = segment_k4a.K4a()
-	playback = ctx.playback_open(str(input_path))
-	transformer = playback.get_calibration().transformation_create()
+	if input_path.suffix == '.mkv':
+		ctx = segment_k4a.K4a()
+		playback = ctx.playback_open(str(input_path))
+		img_iter = get_images_from_recording(playback)
+	if input_path.suffix == '.npy':
+		img_iter = get_images_from_datasets(input_path)
+	if not img_iter:
+		parser.error('input file type is not supported')
 
 	output_dataset = []
-	for cap in playback.get_capture_iter():
+	for depth, colour, colour_trans in img_iter:
 		print('processing new capture...')
-		colour = cap.get_colour_image()
-		depth = cap.get_depth_image()
 
-		if colour is None or depth is None:
-			print('colour or depth image is missing. skip this capture')
-			continue
-
-		colour_trans = transformer.color_image_to_depth_camera(colour, depth)
 		depth_norm = cv2.cvtColor(
 			cv2.normalize(depth, None, 0, 0xff, cv2.NORM_MINMAX, cv2.CV_8UC1),
 			cv2.COLOR_GRAY2BGRA
 			)
-		img_preview = np.hstack((
-			depth_norm,
-			colour_trans
-		))
+		if colour_trans:
+			img_preview = np.hstack((
+				depth_norm,
+				colour_trans
+			))
+		else:
+			img_preview = depth_norm
 
 		cv2.imshow('preview', img_preview)
 		key = cv2.waitKey()
