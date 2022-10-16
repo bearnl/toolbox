@@ -1,46 +1,75 @@
-﻿using System;
-using System.Runtime.InteropServices;
-using System.Linq;
-using Microsoft.Maui.Controls;
+﻿using Emgu.CV;
+using Emgu.CV.Structure;
+using Microsoft.UI.Xaml.Media.Imaging;
 using NumSharp;
+using NumSharp.Backends.Unmanaged;
+using NumSharp.Backends;
+using System.Drawing;
+using System.Drawing.Imaging;
+using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.WindowsRuntime;
+using Windows.Graphics.Imaging;
+using System.ComponentModel;
+using Windows.Web.UI;
 
+namespace NpyWorkbench;
 
-namespace NpyWorkbench
+public partial class MainPage : ContentPage
 {
-	public partial class MainPage : ContentPage
+	private InfoPageViewModel infoPageViewModel = new InfoPageViewModel();
+
+	public MainPage()
 	{
-		public MainPage()
+		InitializeComponent();
+	}
+
+
+	private async void OnOpenNpyClicked(object sender, EventArgs e)
+	{
+		var result = await FilePicker.Default.PickAsync(new PickOptions()
 		{
-			InitializeComponent();
-		}
+			PickerTitle = "Select npy file to load",
+			FileTypes = new FilePickerFileType(new Dictionary<DevicePlatform, IEnumerable<string>> {
+				{ DevicePlatform.WinUI, new[] { ".npy" } }
+			})
+		});
 
-		private async void OnOpenFileClicked(object sender, EventArgs e)
+		if (result == null)
+			return;
+
+		var dataset = np.load(result.FullPath);
+		var frame = dataset[":1,:"].Clone();
+		var bitmap = frame.ToBitmap();
+		var stream = new MemoryStream();
+		bitmap.Save(stream, System.Drawing.Imaging.ImageFormat.Bmp);
+		stream.Position = 0;
+
+		Preview.Source = ImageSource.FromStream(() => stream);
+
+	}
+}
+
+public class InfoPageViewModel: INotifyPropertyChanged
+{
+	public event PropertyChangedEventHandler PropertyChanged;
+
+	private string currentDataset;
+
+	protected virtual void OnPropertyChanged(string propertyName)
+	{
+		PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+	}
+
+	public string CurrentDataset
+	{
+		get { return currentDataset; }
+		set
 		{
-			//var picker = new FileOpenPicker();
-			//var initializeWithWindowWrapper = picker.As<IInitializeWithWindow>();
-			//initializeWithWindowWrapper.Initialize(GetActiveWindow());
-			//var file = await picker.PickSingleFileAsync();
-			var path = "D:/Downloads/dataset/datasets/mycapture/mar-22-ranyi-dk-2-colour.npy";
-			var matrix = np.load(path);
-			ShapeLabel.Text = $"Matrix shape: [{String.Join(",", matrix.shape)}]";
-			var firstImage = matrix[0];
-			var preview = firstImage.ToBitmap();
-
-
+			if (currentDataset != value)
+			{
+				currentDataset = value;
+				OnPropertyChanged("CurrentDataset");
+			}
 		}
-
-		//[ComImport, System.Runtime.InteropServices.Guid("3E68D4BD-7135-4D10-8018-9FB6D9F33FA1"), InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-		//public interface IInitializeWithWindow
-		//{
-		//	void Initialize([In] IntPtr hwnd);
-		//}
-
-		//[DllImport("user32.dll", ExactSpelling = true, CharSet = CharSet.Auto, PreserveSig = true, SetLastError = false)]
-		//public static extern IntPtr GetActiveWindow();
-
-		[DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
-		[return: MarshalAs(UnmanagedType.Bool)]
-		public static extern bool DeleteObject([In] IntPtr hObject);
-
 	}
 }

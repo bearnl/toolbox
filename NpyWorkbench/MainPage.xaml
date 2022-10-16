@@ -1,51 +1,65 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="NpyWorkbench.MainPage"
-             BackgroundColor="{DynamicResource SecondaryColor}">
+			 xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+			 x:Class="NpyWorkbench.MainPage">
 
-    <ScrollView>
-        <Grid RowSpacing="25" RowDefinitions="Auto,Auto,Auto,Auto,*"
-              Padding="{OnPlatform iOS='30,60,30,30', Default='30'}">
+	<ScrollView>
+		<HorizontalStackLayout>
+			<VerticalStackLayout
+			Spacing="25"
+			Padding="30,0"
+			VerticalOptions="Center" WidthRequest="500">
+				<!--<VerticalStackLayout.BindingContext>
+					<local:InfoPageViewModel />
+				</VerticalStackLayout.BindingContext>-->
 
-            <Label 
-                Text="Hello, World!"
-                Grid.Row="0"
-                SemanticProperties.HeadingLevel="Level1"
-                FontSize="32"
-                HorizontalOptions="Center" />
+				<Label
+				Text="{Binding currentDataset}"
+				HorizontalOptions="Start" />
 
-            <Label 
-                Text="Welcome to .NET Multi-platform App UI"
-                Grid.Row="1"
-                SemanticProperties.HeadingLevel="Level1"
-                SemanticProperties.Description="Welcome to dot net Multi platform App U I"
-                FontSize="18"
-                HorizontalOptions="Center" />
+				<Button
+				x:Name="OpenNpy"
+				Text="Open npy file"
+				SemanticProperties.Hint="Open npy file"
+				Clicked="OnOpenNpyClicked"
+				HorizontalOptions="Center" />
 
-            <Label 
-                Text="Matrix shape: Unknown"
-                Grid.Row="2"
-                FontSize="18"
-                FontAttributes="Bold"
-                x:Name="ShapeLabel"
-                HorizontalOptions="Center" />
+			</VerticalStackLayout>
+			<VerticalStackLayout
+			Spacing="25"
+			Padding="30,0"
+			VerticalOptions="Center" WidthRequest="1000">
+				<Image
+				Source="dotnet_bot.png"
+				SemanticProperties.Description="Current input image"
+				HeightRequest="1000"
+				HorizontalOptions="Center"
+				x:Name="Preview" />
 
-            <Button 
-                Text="Open npy"
-                FontAttributes="Bold"
-                Grid.Row="3"
-                SemanticProperties.Hint="Counts the number of times you click"
-                Clicked="OnOpenFileClicked"
-                HorizontalOptions="Center" />
+				<Label
+				Text="Hello, World!"
+				SemanticProperties.HeadingLevel="Level1"
+				FontSize="32"
+				HorizontalOptions="Center" />
+			</VerticalStackLayout>
+			<VerticalStackLayout
+			Spacing="25"
+			Padding="30,0"
+			VerticalOptions="Center" WidthRequest="500">
+				<Label
+				Text="Hello, World!"
+				SemanticProperties.HeadingLevel="Level1"
+				FontSize="32"
+				HorizontalOptions="Center" />
 
-            <Image Grid.Row="4"
-                Source="dotnet_bot.png"
-                SemanticProperties.Description="Cute dot net bot waving hi to you!"
-                WidthRequest="250"
-                HeightRequest="310"
-                HorizontalOptions="Center"
-                x:Name="PreviewImage"/>
+				<Label
+				Text="Welcome to .NET Multi-platform App UI"
+				SemanticProperties.HeadingLevel="Level2"
+				SemanticProperties.Description="Welcome to dot net Multi platform App U I"
+				FontSize="18"
+				HorizontalOptions="Center" />
+			</VerticalStackLayout>
+		</HorizontalStackLayout>
+	</ScrollView>
 
-        </Grid>
-    </ScrollView>
 </ContentPage>
