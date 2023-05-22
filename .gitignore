@@ -2,3 +2,7 @@
 *.pyd
 **/__pycache__
 **/.vscode
+build/
+logs/
+**/*.so
+kinectsdk/

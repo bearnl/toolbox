@@ -17,6 +17,9 @@ except FileNotFoundError:
 	print('Azure Kinect SDK DLL not found')
 except ImportError:
 	print('Unable to import segment_k4a')
+except AttributeError:
+	print('This is Linux and we cannot call add_dll_directory(). Please set LD_LIBRARY_PATH if the module cannot be imported')
+	import segment_k4a
 
 try:
 	import cv2
@@ -232,7 +235,7 @@ if __name__ == '__main__':
 		print('loading numpy dataset')
 		img_iter = get_images_from_datasets(input_depth, input_colour)
 
-	output_dataset = {}
+	output_dataset = []
 	dump_original: str = args.dump_original
 	if dump_original:
 		output_original = []
@@ -248,7 +251,7 @@ if __name__ == '__main__':
 		if colour_trans is None:
 			print('no colour_trans image found, use colour image instead')
 			colour_trans = colour
-		if depth is not None and depth.shape[2] == 3:
+		if depth is not None and len(depth.shape) >=3 and depth.shape[2] == 3:
 			print('depth image has 3 channels. Converting to grayscale...')
 			depth = cv2.cvtColor(depth, cv2.COLOR_BGR2GRAY)
 
@@ -337,23 +340,21 @@ if __name__ == '__main__':
 					print('img is empty, skipped')
 					continue
 
-				if dump_original:
-					output_original.append(colour_trans)
-				if dump_raw_depth:
-					output_raw_depth.append(raw_depth)
-				if label not in output_dataset:
-					output_dataset[label] = []
-				output_dataset[label].append(final)
+		if dump_original:
+			output_original.append(colour_trans)
+		if dump_raw_depth:
+			output_raw_depth.append(raw_depth)
+		output_dataset.append(colour_trans)
 
 print('saving...')
-for label, df in output_dataset.items():
-	out: np.ndarray = np.asarray(df)
-	print('output array size', out.shape)
-	np.save(f'{output_path}_{label}', out)
-	if dump_original:
-		origial: np.ndarray = np.asarray(output_original)
-		np.save(f'{dump_original}_{label}', origial)
-	if dump_raw_depth:
-		raw_depth: np.ndarray = np.asarray(output_raw_depth)
-		np.save(f'{dump_raw_depth}_{label}', raw_depth)
-	print('done')
+df = output_dataset
+out: np.ndarray = np.asarray(df)
+print('output array size', out.shape)
+np.save(f'{output_path}', out)
+if dump_original:
+	origial: np.ndarray = np.asarray(output_original)
+	np.save(f'{dump_original}', origial)
+if dump_raw_depth:
+	raw_depth: np.ndarray = np.asarray(output_raw_depth)
+	np.save(f'{dump_raw_depth}', raw_depth)
+print('done')

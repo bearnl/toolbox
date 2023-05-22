@@ -11,8 +11,10 @@ def get_images_from_recording(playback):
 		if colour is None or depth is None:
 			print('colour or depth image is missing. skip this capture')
 			continue
-
-		colour_trans = transformer.color_image_to_depth_camera(colour, depth)
+		try:
+			colour_trans = transformer.color_image_to_depth_camera(colour, depth)
+		except:
+			colour_trans = None
 		yield depth, colour, colour_trans
 
 
