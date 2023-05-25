@@ -12,25 +12,26 @@ def chunks(np_array, chunk_size=100):
     for i in range(0, len(np_array), chunk_size):
         yield np_array[i:i + chunk_size]
 
-def load_and_convert_to_tf_dataset(directory, rgb_filename, depth_filename):
+def load_and_convert_to_tf_dataset(directories, rgb_filename, depth_filename):
     rgb_writer = tf.io.TFRecordWriter(rgb_filename)
     depth_writer = tf.io.TFRecordWriter(depth_filename)
-    for file in os.listdir(directory):
-        if file.endswith(".npy"):
-            full_path = os.path.join(directory, file)
-            print('Loading', full_path)
-            np_array = load_npy_file(full_path)
-            participant_name = file.split("_")[0]  # Assuming the name is before the ".npy"
-            print('Loaded. Label set to', participant_name)
+    for directory in directories:
+        for file in os.listdir(directory):
+            if file.endswith(".npy"):
+                full_path = os.path.join(directory, file)
+                print('Loading', full_path)
+                np_array = load_npy_file(full_path)
+                participant_name = file.split("_")[0]  # Assuming the name is before the ".npy"
+                print('Loaded. Label set to', participant_name)
 
-            for frame in np_array:  # iterating over each frame
-                image = tf.convert_to_tensor(frame)
-                tf_example = image_example(image, participant_name)
+                for frame in np_array:  # iterating over each frame
+                    image = tf.convert_to_tensor(frame)
+                    tf_example = image_example(image, participant_name)
 
-                if file.endswith('rgb.npy'):
-                    rgb_writer.write(tf_example.SerializeToString())
-                elif file.endswith('depth.npy'):
-                    depth_writer.write(tf_example.SerializeToString())
+                    if file.endswith('rgb.npy'):
+                        rgb_writer.write(tf_example.SerializeToString())
+                    elif file.endswith('depth.npy'):
+                        depth_writer.write(tf_example.SerializeToString())
 
     rgb_writer.close()
     depth_writer.close()
@@ -95,9 +96,10 @@ def inspect_tfrecord(tfrecord_file):
 
 
 def main(args):
-    # Sanity checks
-    if not os.path.isdir(args.directory):
-        raise ValueError(f"{args.directory} is not a valid directory")
+    directories = args.directories
+    for directory in directories:
+        if not os.path.isdir(directory):
+            raise ValueError(f"{directory} is not a valid directory")
 
     if not args.output:
         raise ValueError("Output filename cannot be empty")
@@ -111,11 +113,11 @@ def main(args):
         print("Inspecting Depth tfrecords")
         inspect_tfrecord(depth_filename)
     else:
-        load_and_convert_to_tf_dataset(args.directory, rgb_filename, depth_filename)
+        load_and_convert_to_tf_dataset(directories, rgb_filename, depth_filename)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert npy files to tfrecord files')
-    parser.add_argument('directory', type=str, help='Directory containing npy files')
+    parser.add_argument('directories', type=str, nargs='+', help='Directories containing npy files')
     parser.add_argument('output', type=str, help='Output tfrecord filename without extension')
     parser.add_argument('--inspect', action='store_true', help='Inspect tfrecord files')
 

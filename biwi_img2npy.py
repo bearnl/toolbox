@@ -10,8 +10,8 @@ except ImportError:
 	site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
 import cv2
 
-DATASET_PATH = '/home/chenzz/datasets/biwi/Training'
-OUTPUT_PATH = '/home/chenzz/datasets/biwi'
+DATASET_PATH = '/home/chenzz/projects/def-czarnuch/chenzz/rawdata/biwi/Testing/Walking'
+OUTPUT_PATH = '/home/chenzz/projects/def-czarnuch/chenzz/datasets/biwi-testing-walking'
 
 # Iterate through all sub-directories in DATASET_PATH
 for subdir in os.listdir(DATASET_PATH):
@@ -28,8 +28,10 @@ for subdir in os.listdir(DATASET_PATH):
         for file in glob.glob(os.path.join(subdir_path, '*_rgb.jpg')):
             # Read the image file using OpenCV
             img = cv2.imread(file)
+            if not img:
+                continue
             # Get the participant number from the file name
-            participant_num = os.path.basename(file).split('_')[0][-3:]
+            participant_num = os.path.basename(file).split('_')[0][:3]
 
             # Store the image data in the appropriate dictionary
             if participant_num not in rgb_data:
@@ -39,8 +41,10 @@ for subdir in os.listdir(DATASET_PATH):
         for file in glob.glob(os.path.join(subdir_path, '*_depth.pgm')):
             # Read the image file using OpenCV
             img = cv2.imread(file, cv2.IMREAD_ANYDEPTH)
+            if not img:
+                continue
             # Get the participant number from the file name
-            participant_num = os.path.basename(file).split('_')[0][-3:]
+            participant_num = os.path.basename(file).split('_')[0][:3]
 
             # Store the image data in the appropriate dictionary
             if participant_num not in depth_data:
@@ -49,8 +53,10 @@ for subdir in os.listdir(DATASET_PATH):
 
         # Save the image data as .npy files
         for participant_num, img_array in rgb_data.items():
+            print('RGB size', len(img_array))
             np.save(os.path.join(OUTPUT_PATH, f"{participant_num}_rgb.npy"), img_array)
         for participant_num, img_array in depth_data.items():
+            print('depth size', len(img_array))
             np.save(os.path.join(OUTPUT_PATH, f"{participant_num}_depth.npy"), img_array)
 
         print("All images have been converted to .npy files.")
