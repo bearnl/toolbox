@@ -17,8 +17,8 @@ except ImportError:
 	site.addsitedir('D:\\Program Files\\opencv-4.5.0-dldt-2021.1-vc16-avx2\\opencv\\build\\python')
 import cv2
 
-DATASET_PATH = 'D:\Downloads\mensa_seq0_1.1'
-OUTPUT_PATH = 'D:\Downloads\mensa_extracted'
+DATASET_PATH = './mensa_seq0_1.1'
+OUTPUT_PATH = './mensa_extracted'
 
 def clip_coordinates(x, y, w, h, img_width, img_height):
     x = max(0, x)
