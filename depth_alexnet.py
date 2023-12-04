@@ -201,95 +201,61 @@ def load_mensa(directory, depth8=False):
         depth_data.take(VALIDATION_SIZE)
         ), labels
 
+def load_inhouse(directory, depth8=False):
 
-def load_inhouse(paths, depth8=False):
-    try:
-        import segment_k4a
-    except FileNotFoundError:
-        print('Azure Kinect SDK DLL not found')
-    except ImportError:
-        print('Unable to import segment_k4a')
+    def load_and_preprocess_from_path_label(data_path):
+        # Read image file
+        image = tf.io.read_file(data_path)
 
-    label_map = {
-        '3': 'lady1', 
-        '4': 'lady1', 
-        '7': 'lady2', 
-        '8': 'lady2', 
-        '5': 'man1', 
-        '6': 'man2', 
-        '1': 'stephen', 
-        '2': 'stephen', 
-        '9': 'stephen'
-    }
+        # Get label (folder name) from file path
+        label = tf.strings.split(data_path, '_')[-2]
+        
+        # Check if image is depth or rgb
+        is_depth = tf.strings.regex_full_match(data_path, ".*_depth\.png")
+        
+        # Decode image: 1 channel if depth, 3 if RGB
+        image = tf.cond(is_depth,
+            lambda: tf.image.decode_png(image, channels=1),
+            lambda: tf.image.decode_png(image, channels=3))
 
-    def get_images_from_recording(playback):
-        for cap in playback.get_capture_iter():
-            colour = cap.get_colour_image()
-            depth = cap.get_depth_image()
-            if colour is None or depth is None:
-                print('colour or depth image is missing. skip this capture')
-                continue
-            yield depth, colour
+        # Remap to depth8 if depth image and depth8 is True
+        if depth8 and is_depth:
+            min_val = tf.reduce_min(image)
+            max_val = tf.reduce_max(image)
+            image = ((image - min_val) / (max_val - min_val)) * 255
+            image = tf.cast(image, tf.uint8)
 
-    def generator():
-        for path in paths:
-            files = [os.path.join(path, f) for f in os.listdir(path) if f.endswith('.mkv')]
-            for file in files:
-                filename = os.path.basename(file)
-                label = None
-                if 'leo-recording' in path:
-                    label = 'leo'
-                elif 'mycapture' in path:
-                    label = filename.split('-')[2]
-                elif 'stephen-stair-dk' in path:
-                    label = label_map[filename.split('-')[-1].replace('.mkv', '')]
+        # Resize image to the desired size
+        image = tf.image.resize(image, [256, 256])
 
-                print('processing file', file, 'label', label)
-                ctx = segment_k4a.K4a()
-                playback = ctx.playback_open(file)
-                img_iter = get_images_from_recording(playback)
-                for depth, color in img_iter:
-                    depth = cv2.resize(depth, (256, 256))
-                    if depth8:
-                        depth = remap_to_depth8(depth)
-                    color = cv2.resize(color, (256, 256))
-                    yield depth, color[..., :3], tf.constant(label, dtype=tf.string)
+        return image, label
 
-    output_signature = (
-        tf.TensorSpec(shape=(256, 256), dtype=tf.float32),
-        tf.TensorSpec(shape=(256, 256, 3), dtype=tf.float32),
-        tf.TensorSpec(shape=(), dtype=tf.string),
-    )
-    
-    # # Create a dataset and count the elements
-    # dataset = tf.data.Dataset.from_generator(generator, output_signature=output_signature)
-    # labels = [label.numpy() for _, _, label in dataset]
-    # size = len(labels)
-    # labels = list(set(labels))
-    # print('XXX', size, labels)
-    size = 15522
-    labels = ['xiaoyu', 'lirunze', 'man2', 'stephen', 'bear', 'man1', 'leo', 'lady1', 'lady2', 'ranyi']
 
-    # Create another dataset for the actual usage
-    dataset = tf.data.Dataset.from_generator(generator,
-        output_signature=output_signature,
-        )
+    file_list = tf.data.Dataset.list_files(directory + '/*/*')
+    print('counting files...')
+    files = [1 for _ in file_list]
+    size = len(files)
+    print('file count', size)
+    file_list = tf.data.Dataset.list_files(directory + '/*/*')
+    # file_list = file_list.shuffle(buffer_size=size)
 
-    rgb_dataset = dataset.map(lambda x, y, z: (y, z))
-    depth_dataset = dataset.map(lambda x, y, z: (x, z))
+    depth_filelist = file_list.filter(lambda x: tf.strings.regex_full_match(x, ".*_depth\.png"))
+    rgb_filelist = file_list.filter(lambda x: tf.strings.regex_full_match(x, ".*_rgb\.png"))
 
-    rgb_dataset = rgb_dataset.shuffle(buffer_size=size, reshuffle_each_iteration=False)
-    depth_dataset = depth_dataset.shuffle(buffer_size=size, reshuffle_each_iteration=False)
-    
-    VALIDATION_SIZE = 400
+    depth_data = depth_filelist.map(load_and_preprocess_from_path_label).shuffle(buffer_size=size/2)
+    rgb_data = rgb_filelist.map(load_and_preprocess_from_path_label).shuffle(buffer_size=size/2)
+
+    labels = ['leo', 'bear', 'ranyi', 'xiaoyu', 'lirunze', 'lady1', 'lady2', 'man1', 'man2', 'stephen']
+
+    VALIDATION_SIZE = 1500
+
     return (
-        rgb_dataset.skip(VALIDATION_SIZE),
-        rgb_dataset.take(VALIDATION_SIZE)
+        rgb_data.skip(VALIDATION_SIZE),
+        rgb_data.take(VALIDATION_SIZE)
         ), (
-        depth_dataset.skip(VALIDATION_SIZE),
-        depth_dataset.take(VALIDATION_SIZE)
+        depth_data.skip(VALIDATION_SIZE),
+        depth_data.take(VALIDATION_SIZE)
         ), labels
-
 
 def create_alexnet(input_shape, num_classes):
     print(f'Creating model for {input_shape}, # class={num_classes}')
@@ -421,7 +387,11 @@ def train_model(dataset, test_dataset, labels, input_shape, log_path):
     mirrored_strategy = tf.distribute.MirroredStrategy()
     early_stopping = EarlyStopping(patience=10)
     log_dir = f'{log_path}'
-    tensorboard = TensorBoard(log_dir=log_dir)
+    tensorboard = TensorBoard(
+        log_dir=log_dir,
+        write_images=True,
+        write_steps_per_second=True,
+        )
     # tf.debugging.experimental.enable_dump_debug_info(log_dir, tensor_debug_mode="FULL_HEALTH", circular_buffer_size=-1)
 
     with mirrored_strategy.scope():
@@ -451,7 +421,7 @@ class PerformanceMetrics(Callback):
         self.log_dir = log_dir
         self.label_encoder = label_encoder
         self.writer = tf.summary.create_file_writer(f'{self.log_dir}/validation')
-        self.image_writer = tf.summary.create_file_writer(f'{self.log_dir}/validation/cm')
+        self.image_writer = tf.summary.create_file_writer(f'{self.log_dir}/validation')
 
     def on_epoch_end(self, epoch, logs=None):
         logs = logs or {}
@@ -578,11 +548,8 @@ if __name__ == '__main__':
             DATA_TYPE=='depth8'
             )
     elif INPUT_DATASET == 'inhouse':
-        rgb, depth, labels = load_inhouse([
-            '/home/chenzz/projects/def-czarnuch/chenzz/rawdata/leo-recording',
-            '/home/chenzz/projects/def-czarnuch/chenzz/rawdata/mycapture',
-            '/home/chenzz/projects/def-czarnuch/chenzz/rawdata/stephen-stair-dk',
-            ],
+        rgb, depth, labels = load_inhouse(
+            '/home/chenzz/projects/def-czarnuch/chenzz/datasets/inhouse',
             DATA_TYPE=='depth8')
     else:
         raise ValueError('Unknown dataset', INPUT_DATASET)
