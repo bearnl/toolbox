@@ -1,0 +1,6 @@
+# These are authored on Windows but executed on a Linux cluster.
+# Without this, core.autocrlf=true can hand a CRLF shell script to bash, which
+# fails with: $'\r': command not found
+*.slurm  text eol=lf
+*.sh     text eol=lf
+*.py     text eol=lf
