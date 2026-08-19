@@ -13,6 +13,8 @@ import glob
 import argparse
 import numpy as np
 
+from hiride_keys import cell_key
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -45,18 +47,10 @@ def main():
 
     groups = {}
     for r in rows:
-        arch = (r["arch"] + ("/scratch" if (r["arch"] == "convnext_tiny" and r.get("init") == "scratch") else "")
-                + (f"/{r['head']}" if r.get("head", "gap") != "gap" else "")
-                + (f"/aug{r['augment']}" if r.get("augment", 0) else "")
-                + (f"/tf{r['test_fuse']}" if r.get("test_fuse", 1) > 1 else ""))
-        # frames/encoding MUST be in the key, like bits: without them the
-        # --frames 10 and normals variants of a condition merge into their base
-        # cell and the mean is computed over two different experiments.
-        cond = (r["condition"] + (f"@{r['bits']}b" if r.get("bits", 16) < 16 else "")
-                + (f"/f{r['frames']}" if r.get("frames", 1) > 1 else "")
-                + ("/nrm" if r.get("encoding", "raw") == "normals" else ""))
-        key = (r["policy"], r["modality"], arch, cond, r.get("permuted", False))
-        groups.setdefault(key, []).append(r)
+        # The key lives in hiride_keys so collate, stats and figures cannot drift
+        # apart -- they did, four times, and each drift silently averaged two
+        # different experiments together.
+        groups.setdefault(cell_key(r), []).append(r)
 
     print(f"\n{len(rows)} runs in {len(groups)} cells\n")
     hdr = (f"{'policy':<22s} {'mod':<6s} {'arch':<9s} {'cond':<11s} {'n':>2s} "
@@ -64,8 +58,8 @@ def main():
            f"{'1/K':>6s} {'floor':>7s} {'epochs':>10s}")
     print(hdr)
     print("-" * len(hdr))
-    for key in sorted(groups):
-        policy, mod, arch, cond, perm = key
+    for key in sorted(groups, key=lambda k: tuple("" if v is None else str(v) for v in k)):
+        policy, guard_k, mod, arch, cond, perm = key
         g = groups[key]
         acc = np.array([x["frame_acc"] for x in g]) * 100
         ps = np.array([x["per_subject_acc"] for x in g]) * 100
@@ -75,8 +69,8 @@ def main():
         chance = g[0]["chance"] * 100
         # The floor names block rungs by guard ("R1_block_guard150") while a run
         # records policy + guard separately, so a bare .get(policy) misses.
-        guard = g[0].get("guard")
-        fl = floor.get(f"{policy}_guard{guard}" if guard is not None else policy)
+        # guard_k comes from the cell key, so it cannot disagree with the group.
+        fl = floor.get(f"{policy}_guard{guard_k}" if guard_k is not None else policy)
         fl_s = f"{fl['frame_acc'] * 100:6.2f}" if fl else "     -"
         name = policy + ("[perm]" if perm else "")
         capped = sum(bool(x.get("hit_epoch_cap")) for x in g)
