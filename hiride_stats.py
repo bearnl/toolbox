@@ -25,6 +25,8 @@ from math import lgamma
 
 import numpy as np
 
+from hiride_keys import cell_key, cond_key, arch_key
+
 
 def load_cells(runs):
     cells = {}
@@ -37,14 +39,11 @@ def load_cells(runs):
         z = np.load(cm, allow_pickle=False)
         if "test_rows" not in z.files:                 # old-path cell, no per-frame data
             continue
-        # `bits` MUST be part of the key. Without it the six quantisation
-        # variants of one condition collide and only the last file read
-        # survives -- silently dropping cells rather than erroring.
-        key = (r["policy"], r.get("guard"), r["modality"], r["arch"], r["condition"],
-               int(r.get("bits", 16)), int(r.get("frames", 1)),
-               str(r.get("encoding", "raw")), str(r.get("head", "gap")),
-               int(r.get("augment", 0)), int(r.get("test_fuse", 1)),
-               bool(r.get("permuted", False)), r["seed"])
+        # The key comes from hiride_keys so this file cannot drift from
+        # hiride_collate.py -- it did, repeatedly, and each drift silently
+        # collided cells (only the last file read survived) or averaged two
+        # different experiments. Adding an axis there covers both consumers.
+        key = cell_key(r) + (r["seed"],)
         cells[key] = dict(meta=r, rows=z["test_rows"], subj=z["test_subject"].astype(str),
                           truth=z["truth"], pred=z["pred"])
     return cells
@@ -100,13 +99,13 @@ def main():
     for key, c in cells.items():
         groups.setdefault(key[:-1], []).append(c)
     print(f"\n{len(cells)} cells with per-frame predictions\n")
-    hdr = (f"{'policy':<20s}{'mod':<6s}{'arch':<9s}{'condition':<16s}{'perm':<5s}{'n':>2s} "
+    hdr = (f"{'policy':<20s}{'mod':<6s}{'arch':<26s}{'condition':<28s}{'perm':<5s}{'n':>2s} "
            f"{'frame acc':>12s} {'subj-boot 95% CI':>20s} {'per-subj':>9s} {'1/K':>6s} {'maj':>6s}")
     print(hdr)
     print("-" * len(hdr))
-    for gkey in sorted(groups, key=lambda k: (k[0], k[2], k[5])):
+    for gkey in sorted(groups, key=lambda k: tuple(str(v) for v in k)):
         g = groups[gkey]
-        policy, guard, mod, arch, cond, bits, nfr, enc, hd, aug, tf, perm = gkey
+        policy, guard, mod, arch, cond, perm = gkey
         accs, los, his, per_subj = [], [], [], []
         for c in g:
             correct = (c["pred"] == c["truth"]).astype(float)
@@ -115,25 +114,25 @@ def main():
             per_subj.append(np.mean([correct[c["subj"] == s].mean() for s in np.unique(c["subj"])]))
         m = g[0]["meta"]
         rec = dict(policy=policy, guard=guard, modality=mod, arch=arch, condition=cond,
-                   bits=bits, frames=nfr, encoding=enc, head=hd, augment=aug,
-                   test_fuse=tf, permuted=perm, n_seeds=len(g),
+                   bits=m.get("bits", 16), frames=m.get("frames", 1),
+                   encoding=m.get("encoding", "raw"), head=m.get("head", "gap"),
+                   augment=m.get("augment", 0), test_fuse=m.get("test_fuse", 1),
+                   eligibility=m.get("eligibility", "cues"),
+                   base_condition=m["condition"], permuted=perm, n_seeds=len(g),
                    frame_acc_mean=float(np.mean(accs)), frame_acc_sd=float(np.std(accs)),
                    subj_ci_lo_mean=float(np.mean(los)), subj_ci_hi_mean=float(np.mean(his)),
                    per_subject_acc_mean=float(np.mean(per_subj)),
                    chance=m["chance"], majority=m.get("majority_class_rate"))
         out["cells"].append(rec)
         name = policy + (f"g{guard}" if guard is not None else "")
-        arch_s = {"alexnet": "alexnet", "convnext_tiny": "cnxt-in"}.get(arch, arch)
-        cond_s = (cond + (f"@{bits}b" if bits < 16 else "")
-                  + (f"/f{nfr}" if nfr > 1 else "") + ("/nrm" if enc == "normals" else "")
-                  + (f"/{hd}" if hd != "gap" else "")
-                  + (f"/aug{aug}" if aug else "") + (f"/tf{tf}" if tf > 1 else ""))
+        arch_s = arch.replace("convnext_tiny", "cnxt-in")
+        cond_s = cond                       # already composite, straight from cell_key
         # A CI whose lower bound clears the majority-class rate is the only kind
         # this study calls a positive result: at R4 there are 28 subjects, so a
         # frame-level number several points above 1/K can still be one lucky
         # subject.
         flag = " *" if rec["subj_ci_lo_mean"] > (m.get("majority_class_rate") or 0) else ""
-        print(f"{name:<20s}{mod:<6s}{arch_s:<9s}{cond_s:<16s}{'perm' if perm else '':<5s}{len(g):>2d} "
+        print(f"{name:<20s}{mod:<6s}{arch_s:<26s}{cond_s:<28s}{'perm' if perm else '':<5s}{len(g):>2d} "
               f"{100 * rec['frame_acc_mean']:6.2f} ±{100 * rec['frame_acc_sd']:4.2f} "
               f"[{100 * rec['subj_ci_lo_mean']:6.2f}, {100 * rec['subj_ci_hi_mean']:6.2f}]"
               f"{100 * rec['per_subject_acc_mean']:9.2f} "
@@ -147,10 +146,12 @@ def main():
     print("-" * len(hdr))
     pol_diffs = {}
     for key in sorted(cells):
-        policy, guard, mod, arch, cond, bits, nfr, enc, hd, aug, tf, perm, seed = key
+        policy, guard, mod, arch, cond, perm, seed = key
         if mod != "rgb" or perm:
             continue
-        dkey = (policy, guard, "depth", arch, cond, bits, nfr, enc, hd, aug, tf, perm, seed)
+        # the depth twin of this cell: same everything, modality swapped. Built
+        # through cell_key so it stays correct as axes are added.
+        dkey = cell_key(dict(cells[key]["meta"], modality="depth")) + (seed,)
         if dkey not in cells:
             continue
         R, D = cells[key], cells[dkey]
@@ -188,10 +189,13 @@ def main():
     print("-" * len(hdr))
     cond_rows = {}
     for key in sorted(cells):
-        policy, guard, mod, arch, cond, bits, nfr, enc, hd, aug, tf, perm, seed = key
-        if (cond == "full" and bits == 16) or perm:
+        policy, guard, mod, arch, cond, perm, seed = key
+        meta = cells[key]["meta"]
+        if cond == "full" or perm:
             continue
-        fkey = (policy, guard, mod, arch, "full", 16, 1, "raw", hd, aug, tf, perm, seed)
+        # the unedited twin: same model and training, `full` input at 16 bits.
+        fkey = cell_key(dict(meta, condition="full", bits=16, frames=1,
+                             encoding="raw")) + (seed,)
         if fkey not in cells:
             continue
         C, F = cells[key], cells[fkey]
@@ -203,19 +207,14 @@ def main():
         lo, hi = cluster_boot(diff, C["subj"], rng, args.boot)
         rec = dict(policy=policy, guard=guard, modality=mod, arch=arch, condition=cond, seed=seed,
                    cond_acc=float(c_ok.mean()), full_acc=float(f_ok.mean()), diff=float(diff.mean()),
-                   bits=bits, ci=[lo, hi], mcnemar_p=mcnemar_exact(b, c))
+                   bits=meta.get("bits", 16), ci=[lo, hi], mcnemar_p=mcnemar_exact(b, c))
         out.setdefault("conditions", []).append(rec)
-        cond_rows.setdefault((policy, guard, mod, arch,
-                              cond + (f"@{bits}b" if bits < 16 else "")
-                              + (f"/f{nfr}" if nfr > 1 else "")
-                              + ("/nrm" if enc == "normals" else "")
-                              + (f"/{hd}" if hd != "gap" else "")
-                  + (f"/aug{aug}" if aug else "") + (f"/tf{tf}" if tf > 1 else "")), []).append(rec)
+        cond_rows.setdefault((policy, guard, mod, arch, cond), []).append(rec)
     for (policy, guard, mod, arch, cond), rs in sorted(cond_rows.items()):
         name = policy + (f"g{guard}" if guard is not None else "")
         d = np.array([r["diff"] for r in rs]) * 100
         lo = np.mean([r["ci"][0] for r in rs]) * 100; hi = np.mean([r["ci"][1] for r in rs]) * 100
-        print(f"{name:<22s}{mod:<6s}{cond:<11s}{len(rs):>2d} "
+        print(f"{name:<22s}{mod:<6s}{cond:<28s}{len(rs):>2d} "
               f"{100 * np.mean([r['cond_acc'] for r in rs]):6.2f}% {100 * np.mean([r['full_acc'] for r in rs]):6.2f}% "
               f"{d.mean():+9.2f}  {'':>8s}[{lo:+6.2f}, {hi:+6.2f}] {'':>8s}"
               f"{np.median([r['mcnemar_p'] for r in rs]):10.2e}")
