@@ -241,10 +241,47 @@ WAVE12 = dict(
 )
 
 
+# Wave 13 -- DOES THE BOUNDARY FIX STACK? Wave 11 asks whether hiride_prep_edges
+# helps the ORIGINAL gap-head ladder cells (like-for-like against the published
+# table). That is the right control, but it does not answer the question that
+# decides whether we rebuild every shard: does the fix add anything on top of the
+# BEST recipe we now have (stripe head + augment 8 + tracklet fusion, wave 12)?
+# If it does not, prep_edges is a footnote; if it does, the headline numbers move.
+# Runs against PREP=$SCRATCH/hiride2/prep_edges, OUT=$SCRATCH/hiride2/runs_edges.
+# 5 seeds, not wave 12's 3, because these are candidate headline cells and the
+# subject-cluster CI needs the seeds. 40 cells.
+WAVE13 = dict(
+    policies=[("R1_block", "--guard 150"), ("R4_cross_session", "")],
+    cells=[
+        ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10"),
+        ("sil_scaled",    "depth", "--head stripe --augment 8 --test-fuse 10"),
+        ("interior_only", "depth", "--head stripe --augment 8 --test-fuse 10"),
+        ("scale_removed", "rgb",   "--head stripe --augment 8 --test-fuse 10"),
+    ],
+    seeds=[0, 1, 2, 3, 4],
+)
+
+# Wave 14 -- THE MATCHED PARTNER for wave 13, on the ORIGINAL prep. Without it
+# every wave-13 cell is compared against a 3-seed wave-12 number, and the one new
+# condition (interior_only + best recipe) has no partner at all -- an edges-vs-old
+# difference would be confounded with a seed-count difference. Tops the three
+# wave-12 best cells up to 5 seeds and runs interior_only from scratch.
+# PREP=$SCRATCH/hiride2/prep, OUT=$SCRATCH/hiride2/runs. 22 cells.
+WAVE14 = dict(
+    policies=[("R1_block", "--guard 150"), ("R4_cross_session", "")],
+    cells=[
+        ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10", [3, 4]),
+        ("sil_scaled",    "depth", "--head stripe --augment 8 --test-fuse 10", [3, 4]),
+        ("scale_removed", "rgb",   "--head stripe --augment 8 --test-fuse 10", [3, 4]),
+        ("interior_only", "depth", "--head stripe --augment 8 --test-fuse 10", [0, 1, 2, 3, 4]),
+    ],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -308,6 +345,18 @@ def main():
             for cond, mod, flags, arch in WAVE12["cells"]:
                 for seed in WAVE12["seeds"]:
                     lines.append(f"--policy {policy} --modality {mod} --arch {arch} "
+                                 f"--condition {cond} --seed {seed} {flags} {extra}".strip())
+    elif args.wave == 13:
+        for policy, extra in WAVE13["policies"]:
+            for cond, mod, flags in WAVE13["cells"]:
+                for seed in WAVE13["seeds"]:
+                    lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
+                                 f"--condition {cond} --seed {seed} {flags} {extra}".strip())
+    elif args.wave == 14:
+        for policy, extra in WAVE14["policies"]:
+            for cond, mod, flags, seeds in WAVE14["cells"]:
+                for seed in seeds:
+                    lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} {extra}".strip())
     elif args.wave == 11:
         for policy, extra in WAVE11["policies"]:

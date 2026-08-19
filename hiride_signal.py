@@ -361,9 +361,18 @@ def main():
     print("    much higher than whiten, the failure is a fixable offset, not missing information.")
     if args.out:
         os.makedirs(args.out, exist_ok=True)
-        with open(os.path.join(args.out, "signal_diagnostic.json"), "w") as fh:
+        # The filename MUST carry what varies between probes. A fixed
+        # "signal_diagnostic.json" let the balanced (--per-class 90) and the
+        # all-frames (--per-class 0) runs overwrite each other, and would do the
+        # same across prep dirs -- the same silent-merge bug the collate cell
+        # keys had four times.
+        tag = f"pc{args.per_class}_{os.path.basename(os.path.normpath(args.prep))}"
+        name = f"signal_diagnostic_{tag}.json"
+        report["per_class"] = args.per_class
+        report["prep"] = os.path.abspath(args.prep)
+        with open(os.path.join(args.out, name), "w") as fh:
             json.dump(report, fh, indent=1)
-        print(f"\n[written] {os.path.join(args.out, 'signal_diagnostic.json')}")
+        print(f"\n[written] {os.path.join(args.out, name)}")
 
 
 if __name__ == "__main__":
