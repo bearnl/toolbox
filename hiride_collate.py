@@ -80,6 +80,20 @@ def main():
               f"{acc.mean():8.2f} ±{acc.std():4.2f} {ps.mean():8.2f}  {f1.mean():7.3f} "
               f"{chance:5.2f}% {fl_s} {be.mean():4.1f}/{er.mean():4.1f}{cap_s}")
 
+    # Short cells are the visible symptom of a run that failed, was cancelled, or
+    # never got submitted -- and reading a 3-seed mean as if it were 5 is exactly
+    # the kind of thing that quietly ends up in a table. Name them.
+    counts = [len(g) for g in groups.values()]
+    modal = max(set(counts), key=counts.count)
+    short = [(k, len(g)) for k, g in groups.items() if len(g) < modal]
+    if short:
+        print(f"\n{len(short)} cell(s) with fewer than the usual {modal} seeds "
+              f"-- check these finished:")
+        for k, n in sorted(short, key=lambda kv: kv[1]):
+            policy, guard_k, mod, arch, cond, perm = k
+            print(f"  n={n}  {policy}{'' if guard_k is None else f'g{guard_k}'} "
+                  f"{mod} {arch} {cond}{' [perm]' if perm else ''}")
+
     print("\nfloor = trivial-cue RF on the same split (13 scalars, shipped masks).")
     print("epochs = mean best_epoch / mean epochs_run. best_epoch at 0-1 with an early")
     print("stop means the model is overfitting, not converging. cap:N = N seeds hit")

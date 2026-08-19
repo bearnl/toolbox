@@ -64,7 +64,7 @@ if [ -z "$P" ]; then echo "  (hiride-preds has not written signal_preds_*.npz ye
 fi
 
 echo; echo "=================== 9. subject-cluster CIs on the headline cells ==================="
-python hiride_stats.py --runs "$R/runs" --json "$R/results/stats_final.json" 2>&1 | tail -45
+python hiride_stats.py --runs "$R/runs" --json "$R/results/stats_final.json"
 
 echo; echo "=================== done ==================="
 echo "Read in this order: (1) nothing failed -> (4) and (5) are the two new questions ->"

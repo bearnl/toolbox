@@ -19,7 +19,7 @@ here in the same commit.
 # Every field that participates in cell identity, with the value that means
 # "default, omit from the key". Anything not listed here is metadata.
 AXES = dict(bits=16, frames=1, encoding="raw", head="gap", augment=0, test_fuse=1,
-            erode=2, depth_slab_mm=None, init=None, eligibility="cues")
+            erode=2, depth_slab_mm=6000.0, init=None, eligibility="cues")
 
 
 def arch_key(r):
@@ -56,6 +56,13 @@ def cond_key(r):
     # seed of the ladder cell with the same name -- it is a different population.
     if r.get("eligibility", "cues") != "cues":
         cond += f"/{r['eligibility']}"
+    # the depth slab narrows the input range before normalisation. No wave
+    # varies it today, but hiride_train.py's filename tag already separates
+    # slab runs, so without this a future sweep merges into the baseline and
+    # shows up only as an inflated n -- exactly how the earlier collisions hid.
+    slab = r.get("depth_slab_mm")
+    if slab is not None and float(slab) < AXES["depth_slab_mm"]:
+        cond += f"/slab{int(float(slab))}"
     return cond
 
 
