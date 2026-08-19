@@ -269,6 +269,9 @@ def main():
                          "interior is sensor-limited its discriminability must RISE as "
                          "people get closer. BIWI spans 1240-3885 mm, so the prediction "
                          "is testable inside one dataset.")
+    ap.add_argument("--eligibility", default="cues", choices=("cues", "full_body"),
+                    help="'full_body' drops frames where the person touches the top or "
+                         "bottom frame edge, in BOTH splits.")
     ap.add_argument("--reps", default=None,
                     help="comma-separated substrings; only representations whose label "
                          "contains one are run. Default: all 14.")
@@ -282,7 +285,8 @@ def main():
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
     z = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
-    keep = eligible_mask(z["cues"], [str(f) for f in z["feats"]])
+    keep = eligible_mask(z["cues"], [str(f) for f in z["feats"]],
+                         full_body=(args.eligibility == "full_body"))
     report = {}
     preds = {}
 
@@ -388,10 +392,12 @@ def main():
         # all-frames (--per-class 0) runs overwrite each other, and would do the
         # same across prep dirs -- the same silent-merge bug the collate cell
         # keys had four times.
-        tag = f"pc{args.per_class}_{os.path.basename(os.path.normpath(args.prep))}"
+        tag = (f"pc{args.per_class}_{os.path.basename(os.path.normpath(args.prep))}"
+               + ("" if args.eligibility == "cues" else f"_{args.eligibility}"))
         name = f"signal_diagnostic_{tag}.json"
         report["per_class"] = args.per_class
         report["prep"] = os.path.abspath(args.prep)
+        report["eligibility"] = args.eligibility
         with open(os.path.join(args.out, name), "w") as fh:
             json.dump(report, fh, indent=1)
         print(f"\n[written] {os.path.join(args.out, name)}")

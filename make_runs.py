@@ -278,10 +278,39 @@ WAVE14 = dict(
 )
 
 
+# Wave 15 -- THE FRAMING SHIFT. hiride_range_profile.py measured the body being
+# clipped at a frame edge in 47.8 % of R4 TEST frames but only 9.2 % of TRAIN
+# frames: a 5x covariate shift in framing between BIWI's two sessions, and one
+# that hurts depth specifically. scale_remove normalises by the person's
+# bounding box, so when the feet are outside the frame the visible box is not
+# the body; the same image row then means a different body part in train and in
+# test, and stripe/flatten -- the heads that WORK because they preserve row
+# correspondence -- are reading a correspondence that no longer holds. RGB is
+# hit far less because its cue (face and clothing texture) survives losing the
+# feet, which is exactly the asymmetry in the per-range table.
+#
+# Same cells as wave 14, so every cell has an exact cues-eligibility partner on
+# the same prep, same recipe, same seeds. CAVEAT to carry into the write-up:
+# requiring a full body also shifts the test range distribution outward (the
+# near bins are the clipped ones), so this arm confounds framing with distance.
+# The clean test is the within-bin contrast in hiride_range_profile.py --preds,
+# where distance is held fixed. Report both or neither. 30 cells.
+WAVE15 = dict(
+    policies=[("R1_block", "--guard 150"), ("R4_cross_session", "")],
+    cells=[
+        ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10"),
+        ("interior_only", "depth", "--head stripe --augment 8 --test-fuse 10"),
+        ("scale_removed", "rgb",   "--head stripe --augment 8 --test-fuse 10"),
+    ],
+    seeds=[0, 1, 2, 3, 4],
+    extra="--eligibility full_body",
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -358,6 +387,13 @@ def main():
                 for seed in seeds:
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} {extra}".strip())
+    elif args.wave == 15:
+        for policy, extra in WAVE15["policies"]:
+            for cond, mod, flags in WAVE15["cells"]:
+                for seed in WAVE15["seeds"]:
+                    lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
+                                 f"--condition {cond} --seed {seed} {flags} "
+                                 f"{WAVE15['extra']} {extra}".strip())
     elif args.wave == 11:
         for policy, extra in WAVE11["policies"]:
             for cond, mod in WAVE11["cells"]:

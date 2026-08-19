@@ -19,7 +19,7 @@ here in the same commit.
 # Every field that participates in cell identity, with the value that means
 # "default, omit from the key". Anything not listed here is metadata.
 AXES = dict(bits=16, frames=1, encoding="raw", head="gap", augment=0, test_fuse=1,
-            erode=2, depth_slab_mm=None, init=None)
+            erode=2, depth_slab_mm=None, init=None, eligibility="cues")
 
 
 def arch_key(r):
@@ -52,6 +52,10 @@ def cond_key(r):
     # 2 everywhere else and would add noise to every key.
     if r["condition"] == "interior_only" and r.get("erode", 2) != 2:
         cond += f"/e{r['erode']}"
+    # eligibility changes WHICH FRAMES are scored, so a full_body cell is not a
+    # seed of the ladder cell with the same name -- it is a different population.
+    if r.get("eligibility", "cues") != "cues":
+        cond += f"/{r['eligibility']}"
     return cond
 
 

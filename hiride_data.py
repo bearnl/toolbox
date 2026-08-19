@@ -163,7 +163,8 @@ def interframe_stats(man):
             "p90": float(np.percentile(vals, 90))}
 
 
-def eligible_mask(cues, feats, min_person_px=2000, max_person_frac=0.25):
+def eligible_mask(cues, feats, min_person_px=2000, max_person_frac=0.25,
+                  full_body=False):
     """The frame-eligibility rule, applied identically to EVERY condition.
 
     22.3% of BIWI Training frames carry a completely empty userMap, and those
@@ -175,7 +176,19 @@ def eligible_mask(cues, feats, min_person_px=2000, max_person_frac=0.25):
     """
     n = cues[:, feats.index("n_person_px")]
     frac = n / float(640 * 480)
-    return (n >= min_person_px) & (frac <= max_person_frac)
+    ok = (n >= min_person_px) & (frac <= max_person_frac)
+    if full_body:
+        # BIWI clips the body at the frame edge in 47.8 % of R4 TEST frames but
+        # only 9.2 % of TRAIN frames (hiride_range_profile.py) -- a 5x covariate
+        # shift in framing between the two sessions. That matters because
+        # scale_remove normalises by the person's bounding box: when the feet
+        # are outside the frame the visible box is not the body, so the same
+        # image row means a different body part in train and test, and every
+        # alignment-preserving head (stripe, flatten) is reading a corrupted
+        # correspondence. Requiring a complete body removes the shift.
+        ok &= (cues[:, feats.index("top_touch")] <= 0)
+        ok &= (cues[:, feats.index("bot_touch")] <= 0)
+    return ok
 
 
 # ---------------------------------------------------------------------------

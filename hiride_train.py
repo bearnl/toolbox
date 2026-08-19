@@ -712,9 +712,14 @@ def main():
                     help="scale_removed only: rescale a slab_mm window centred on the "
                          "person's median depth onto the full input range. Default "
                          "6000 = the global scale (identity transform).")
-    ap.add_argument("--eligibility", choices=("cues", "all"), default="cues",
+    ap.add_argument("--eligibility", choices=("cues", "all", "full_body"), default="cues",
                     help="'all' skips the cue-based frame filter, for a prep that has "
-                         "no masks and therefore no cues (the in-house corpus).")
+                         "no masks and therefore no cues (the in-house corpus). "
+                         "'full_body' additionally requires the person to touch neither "
+                         "the top nor the bottom frame edge, which removes the 5x "
+                         "train/test framing shift documented by hiride_range_profile.py. "
+                         "It changes the evaluated population, so it is a separate "
+                         "reported condition, never a swap-in for the headline number.")
     ap.add_argument("--bits", type=int, default=16, choices=(16, 8, 6, 4, 3, 2, 1),
                     help="depth only: quantise to 2**bits levels at fixed global "
                          "range (16 = untouched). The Z-precision axis.")
@@ -740,7 +745,8 @@ def main():
         keep = np.ones(len(man["subject"]), dtype=bool)
     else:
         cues = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
-        keep = eligible_mask(cues["cues"], [str(f) for f in cues["feats"]])
+        keep = eligible_mask(cues["cues"], [str(f) for f in cues["feats"]],
+                             full_body=(args.eligibility == "full_body"))
 
     kw = {}
     if args.policy.startswith("R1"):
@@ -895,6 +901,7 @@ def main():
         feeding="sequence_v2",                  # code-path provenance for collate
         depth_clip_mm=DEPTH_CLIP_MM, bits=args.bits, depth_slab_mm=args.depth_slab_mm,
         frames=args.frames, encoding=args.depth_encoding, erode=args.erode, head=args.head,
+        eligibility=args.eligibility,
         augment=args.augment, **fused,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),
@@ -915,7 +922,8 @@ def main():
            + ("_nrm" if args.depth_encoding == "normals" else "")
            + (f"_{args.head}" if args.head != "gap" else "")
            + (f"_aug{args.augment}" if args.augment else "")
-           + (f"_tf{args.test_fuse}" if args.test_fuse > 1 else ""))
+           + (f"_tf{args.test_fuse}" if args.test_fuse > 1 else "")
+           + (f"_{args.eligibility}" if args.eligibility != "cues" else ""))
     with open(os.path.join(args.out, f"results_{tag}.json"), "w") as fh:
         json.dump(res, fh, indent=1)
     # Per-frame predictions keyed on manifest row: RGB and depth cells of one
