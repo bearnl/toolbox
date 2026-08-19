@@ -60,6 +60,11 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--bins", default=DEFAULT_BINS)
     ap.add_argument("--eligibility", default="default", choices=("default", "all"))
+    ap.add_argument("--preds", default=None,
+                    help="signal_preds_*.npz from hiride_signal.py --save-preds. Enables "
+                         "the within-bin truncation contrast, which is the only test that "
+                         "separates truncation from distance -- they are confounded across "
+                         "bins because BIWI's near frames are also its clipped frames.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
@@ -121,6 +126,9 @@ def main():
                                              for a in accs))
         print()
 
+    if args.preds:
+        truncation_contrast(args.preds, args.policy, p_med, bot, top, bbox_h, edges)
+
     print("HOW TO READ THIS. The truncation account predicts that the near bins where depth")
     print("loses are the bins where the body is clipped: high edge-touch and small bbox_h at")
     print("0-2000 mm, both recovering by 3000-3500 mm. If instead edge-touch is flat across")
@@ -148,6 +156,48 @@ def main():
         with open(p, "w") as fh:
             json.dump(rec, fh, indent=1)
         print(f"\n[written] {p}")
+
+
+def truncation_contrast(path, policy, p_med, bot, top, bbox_h, edges, min_n=60):
+    """Accuracy on clipped vs unclipped frames INSIDE one range bin.
+
+    Across bins, truncation and distance are perfectly confounded in BIWI: the
+    2000-2500 mm bin is 87.4 % bottom-clipped and the 3000-3500 mm bin is 3.3 %,
+    so "depth does worse up close" and "depth does worse when the feet are cut
+    off" predict the identical curve. Holding the bin fixed breaks the tie. The
+    2500-3000 mm bin is the informative one -- it is roughly a 48/52 split, so
+    both arms are populated.
+    """
+    z = np.load(path, allow_pickle=False)
+    cells = sorted({k.rsplit("::", 1)[0] for k in z.files})
+    cells = [c for c in cells if c.startswith(f"{policy}|")]
+    if not cells:
+        print(f"  (no predictions for {policy} in {os.path.basename(path)})")
+        return
+    print("Within-bin truncation contrast (whitened probe; bin held fixed, so distance "
+          "cannot explain the difference):\n")
+    hdr = (f"  {'representation':<24s}{'bin (mm)':<13s}{'clipped n':>10s}{'acc':>8s}"
+           f"{'clean n':>9s}{'acc':>8s}{'clipped-clean':>15s}")
+    print(hdr); print("  " + "-" * (len(hdr) - 2))
+    for cell in cells:
+        rows = z[f"{cell}::rows"]; pred = z[f"{cell}::pred"]; truth = z[f"{cell}::truth"]
+        ok = (pred == truth).astype(float)
+        b = bin_index(p_med[rows], edges)
+        label = cell.split("|", 1)[1]
+        for k in range(len(edges) - 1):
+            m = b == k
+            if not m.any():
+                continue
+            clipped = m & (bot[rows] | top[rows])
+            clean = m & ~(bot[rows] | top[rows])
+            if clipped.sum() < min_n or clean.sum() < min_n:
+                continue                     # one arm too small to read
+            a1, a0 = ok[clipped].mean(), ok[clean].mean()
+            print(f"  {label:<24s}{int(edges[k])}-{int(edges[k+1]):<8d}"
+                  f"{int(clipped.sum()):>10d}{100*a1:>7.2f}%"
+                  f"{int(clean.sum()):>9d}{100*a0:>7.2f}%{100*(a1-a0):>+14.2f} pp")
+    print(f"\n  (bins where either arm has < {min_n} frames are omitted -- with BIWI's")
+    print("   87 %/3 % clipping split most bins have only one populated arm.)\n")
 
 
 def read_probe_bins(blob, policy, edges):

@@ -269,6 +269,13 @@ def main():
                          "interior is sensor-limited its discriminability must RISE as "
                          "people get closer. BIWI spans 1240-3885 mm, so the prediction "
                          "is testable inside one dataset.")
+    ap.add_argument("--reps", default=None,
+                    help="comma-separated substrings; only representations whose label "
+                         "contains one are run. Default: all 14.")
+    ap.add_argument("--save-preds", action="store_true",
+                    help="write per-frame whitened-probe predictions and their manifest "
+                         "rows, so accuracy can be re-sliced (by truncation, by subject, "
+                         "by recording) without paying for the probe again.")
     ap.add_argument("--seed", type=int, default=0)
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
@@ -277,6 +284,7 @@ def main():
     z = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
     keep = eligible_mask(z["cues"], [str(f) for f in z["feats"]])
     report = {}
+    preds = {}
 
     for policy in args.policies.split(","):
         kw = {}
@@ -302,7 +310,16 @@ def main():
         p_med = z["cues"][:, [str(f) for f in z["feats"]].index("p_med")]
         edges = [float(x) for x in args.range_bins.split(",")]
         range_rows = []
-        for label, modality, cond, slab, nfr, enc in REPS:
+        reps = REPS
+        if args.reps:
+            want = [w.strip() for w in args.reps.split(",") if w.strip()]
+            reps = [r for r in REPS if any(w in r[0] for w in want)]
+            if not reps:
+                sys.exit(f"--reps {args.reps} matched none of: "
+                         + ", ".join(r[0] for r in REPS))
+            print(f"[reps] running {len(reps)} of {len(REPS)}: "
+                  + ", ".join(r[0] for r in reps))
+        for label, modality, cond, slab, nfr, enc in reps:
             shards = open_shards(args.prep, modality)
             Xtr = load_split_arrays(shards, tr, modality, cond, 16, None, man, slab,
                                     nfr, enc)
@@ -320,6 +337,11 @@ def main():
                   f"{100 * pr['whitened_subj']:>7.2f}%{pr['fisher_train']:>8.2f}")
             # per-range-bin accuracy of the whitened probe, on the SAME predictions
             pw = pr.pop("pred_whitened")
+            if args.save_preds:
+                preds[f"{policy}|{label}"] = dict(
+                    rows=np.asarray(te, dtype=np.int64),
+                    pred=np.asarray(pw, dtype=np.int64),
+                    truth=np.asarray(yte, dtype=np.int64))
             zt = p_med[te]
             per_bin = {}
             for lo, hi in zip(edges[:-1], edges[1:]):
@@ -373,6 +395,14 @@ def main():
         with open(os.path.join(args.out, name), "w") as fh:
             json.dump(report, fh, indent=1)
         print(f"\n[written] {os.path.join(args.out, name)}")
+        if preds:
+            flat = {}
+            for cellk, d in preds.items():
+                for field, arr in d.items():
+                    flat[f"{cellk}::{field}"] = arr
+            pp = os.path.join(args.out, f"signal_preds_{tag}.npz")
+            np.savez_compressed(pp, **flat)
+            print(f"[written] {pp}  ({len(preds)} representations)")
 
 
 if __name__ == "__main__":
