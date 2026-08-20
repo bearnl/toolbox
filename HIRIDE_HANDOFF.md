@@ -1766,6 +1766,90 @@ That is the **eighth** instance of this campaign's signature bug, and the second
 this session — and `hiride_keys.py` had existed for weeks specifically to
 prevent it. **Import `cond_key`/`arch_key`. Never re-derive cell identity.**
 
+### 13.12 THE R4 NUMBER IS ~43 %, NOT 19 % — measurement validity and observation budget
+
+The largest result of this session, and it changes §0. Nothing here is a better
+model; it is two measurement decisions the campaign had not made.
+
+**(a) `stature_mm` is not range-invariant, and it is the top-ranked feature.**
+`hiride_metric_bias.py` fits one global fixed-effects slope per feature against
+standing distance (per-subject fits are not deployable and are ill-conditioned
+for subjects who barely move):
+
+| feature | between-subject SD | slope per metre | drift over the walk |
+|---|---|---|---|
+| `stature_mm` | 105.2 mm | **89.5 mm/m** | ~197 mm — **1.9× the identity signal** |
+| `height_p50` | 67.4 mm | 64.6 mm/m | ~142 mm — 2.1× |
+| `w_15` | 49.9 mm | **−0.9 mm/m** | ~0 |
+| `w_30` | 38.5 mm | **−4.5 mm/m** | ~0 |
+
+**Which features drift names the mechanism.** Widths need no vertical extent and
+do not drift at all. Every HEIGHT-derived feature does, because at close range
+the vertical FOV clips the body and a clipped body is a shorter body. This is
+the frame-truncation confound `hiride_range_profile.py` was built to test,
+appearing as a bias inside the features rather than as a probe-accuracy effect.
+
+**(b) Only 25.6 % of `Testing/Walking` frames contain a whole body**, and 36.3 %
+of R4 test frames sit outside the training corpus's p05–p95 distance band.
+
+Splitting the R4 test set on that gate (`--test-eligibility full_body`):
+
+| R4 test frames | accuracy |
+|---|---|
+| unclipped (2,933) | **28.06 %** |
+| clipped (2,709, back-solved) | **9.3 %** |
+| all (5,642) — the published number | 19.04 % |
+
+Training on unclipped frames as well adds only **+0.83 pp** (28.06 → 28.89), so
+this is not about learning better; it is that a clipped body yields a wrong
+measurement and no training regime repairs it. Rejecting frames the sensor
+cannot measure is quality-gated frame selection — ordinary in biometrics, and a
+real option for a system watching someone walk.
+
+**(c) Composed with an observation budget** (`hiride_sequence.py --full-body`,
+posterior aggregation over consecutive in-recording windows):
+
+| frames per decision | decisions | cnn | metric | geo |
+|---|---|---|---|---|
+| 1 | 2933 | 18.40 | 28.86 | 30.81 |
+| 10 | 281 | 21.42 | 39.72 | 38.43 |
+| **25 (2.5 s)** | **103** | 21.36 | **43.30** | 42.72 |
+| 50 | 45 | 19.11 | 49.33 | 47.11 |
+| whole tracklet | 28 | 20.71 | 50.71 | 50.00 |
+
+Whole-tracklet subject-cluster CI: metric **50.71 % [32.9, 68.6]**, against
+chance 3.57 % and majority 6.34 %.
+
+**QUOTE 43.30 %, NOT 50.71 %.** The whole-tracklet row is one decision per
+subject — 28 of them — and its interval is 36 pp wide. W=25 rests on 103
+decisions and is where the curve is still trustworthy. Always state the gate's
+retained fraction (52.0 % of test frames) beside it: this answers "how well does
+this work where the measurement is valid", which is a different and more useful
+question than "how well does it work when forced to answer regardless", but the
+two must never be quoted as though they were the same.
+
+**The CNN barely benefits** (18.40 → 20.71 across the entire sweep) while the
+metric features nearly double. Systematic error does not average away; noise
+does. Same signature as 13.10's `rescued` column.
+
+**What this does to the paper.** §0's "the honest operating point is ~15 % on a
+28-person enrolled cohort" is wrong and must be rewritten to ~43 % from 2.5 s of
+observation with clipped frames rejected. The privacy conclusion gets STRONGER,
+not weaker: "depth is anonymous because humans cannot read it" is refuted much
+more firmly by 43 % than by 15 %. The deployment sentence should now distinguish
+a single frame (~19 %, and ~9 % if the body is clipped) from a short observation
+under frame selection (~43 %).
+
+**What did NOT work, recorded so it is not retried.** De-trending each feature
+against distance with a global slope COSTS accuracy within a session — R1
+67.97 → 44.30, R3 15.56 → 9.23 — and is neutral at R4 (19.04 → 19.28).
+Distance-correlated variance is a legitimate shared cue when train and test come
+from one session; removing it only helps where the distributions differ, and
+there only marginally. Averaging the FEATURES over a window instead of the
+posteriors also fails, badly and worse with window length (18.83 → 5.37 % at 100
+frames), because a test window spans standing distances a training window never
+does — posterior averaging survives that since each frame still votes separately.
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
@@ -1796,6 +1880,9 @@ prevent it. **Import `cond_key`/`arch_key`. Never re-derive cell identity.**
    retrain. ~8 pp of headroom is proven to exist by the oracle bound; whether a
    joint model reaches it is the question. Cheap: one wave, R4 + R3, three
    conditions, 5 seeds.
-7. Have the trainer save posteriors for VALIDATION rows, not just test rows.
+7. **Re-run 13.12's composition with the best CNN recipe** (`stripe/aug8/tf10`,
+   18.01 % at R4 rather than the 14.59 % gap-head cell used there) and with more
+   seeds, then regenerate every figure and table that quotes an R4 number.
+8. Have the trainer save posteriors for VALIDATION rows, not just test rows.
    Without them no fusion weight can be chosen without touching the test set,
    which is what forced the fixed-weight rules in §13.10.
