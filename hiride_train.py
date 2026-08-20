@@ -190,6 +190,46 @@ def build_convnext(input_shape, n_classes, pretrained=True, head="gap"):
     return tf.keras.Model(inp, out, name="convnext_tiny")
 
 
+# Every axis that makes two runs a DIFFERENT cell. `tag` must encode all of
+# them or runs overwrite each other; the pre-write check below compares these
+# fields against the file already at the target path so a missing axis fails
+# loudly instead of silently costing seeds.
+CELL_FIELDS = ("policy", "modality", "arch", "init", "condition", "seed", "guard",
+               "permuted", "bits", "depth_slab_mm", "frames", "encoding", "erode",
+               "head", "eligibility", "ref_eligibility", "augment", "test_fuse")
+
+
+def run_tag(m):
+    """Canonical filename stem for one training cell, keyed on the result dict.
+
+    ONE definition, used both when writing a run and when auditing the runs
+    directory, so the two can never disagree about what distinguishes a cell.
+    Every field named in CELL_FIELDS must appear here; anything omitted means
+    two different cells share a filename and the second silently destroys the
+    first. That is not hypothetical -- `erode` was missing, so wave 12's e1 and
+    e4 runs were overwritten by e6, taking seeds 0-2 of plain interior_only
+    with them, and the array job reported COMPLETED for all of it.
+    """
+    g = m.get("guard")
+    return (f"{m['policy']}_{m['modality']}_{m['arch']}_{m['condition']}"
+            f"_s{m['seed']}" + ("_perm" if m.get("permuted") else "")
+            + ("_scratch" if (m["arch"] == "convnext_tiny"
+                              and m.get("init") == "scratch") else "")
+            + (f"_b{m['bits']}" if m.get("bits", 16) < 16 else "")
+            + (f"_slab{int(m['depth_slab_mm'])}"
+               if m.get("depth_slab_mm", DEPTH_CLIP_MM) < DEPTH_CLIP_MM else "")
+            + (f"_f{m['frames']}" if m.get("frames", 1) > 1 else "")
+            + ("_nrm" if m.get("encoding") == "normals" else "")
+            + (f"_{m['head']}" if m.get("head", "gap") != "gap" else "")
+            + (f"_aug{m['augment']}" if m.get("augment") else "")
+            + (f"_tf{m['test_fuse']}" if m.get("test_fuse", 1) > 1 else "")
+            + (f"_{m['eligibility']}" if m.get("eligibility", "cues") != "cues" else "")
+            + (f"_e{m['erode']}" if m.get("erode", 2) != 2 else "")
+            + (f"_g{g}" if m["policy"].startswith("R1") and g not in (None, 150) else "")
+            + (f"_ref{m['ref_eligibility']}"
+               if m.get("ref_eligibility", "match") != "match" else ""))
+
+
 def scale_remove(img, mask, fill, is_depth, target_h=SCALE_TARGET_H,
                  target_depth=SCALE_TARGET_DEPTH, slab_mm=DEPTH_CLIP_MM):
     """Person-only frame with apparent size, image position and (depth) standing
@@ -934,18 +974,29 @@ def main():
         **{k: v for k, v in info.items() if k != "chance"})
     res["x_chance"] = res["frame_acc"] / res["chance"]
 
-    tag = (f"{args.policy}_{args.modality}_{args.arch}_{args.condition}"
-           f"_s{args.seed}" + ("_perm" if args.permute_labels else "")
-           + ("_scratch" if (args.arch == "convnext_tiny" and args.init == "scratch") else "")
-           + (f"_b{args.bits}" if args.bits < 16 else "")
-           + (f"_slab{int(args.depth_slab_mm)}" if args.depth_slab_mm < DEPTH_CLIP_MM else "")
-           + (f"_f{args.frames}" if args.frames > 1 else "")
-           + ("_nrm" if args.depth_encoding == "normals" else "")
-           + (f"_{args.head}" if args.head != "gap" else "")
-           + (f"_aug{args.augment}" if args.augment else "")
-           + (f"_tf{args.test_fuse}" if args.test_fuse > 1 else "")
-           + (f"_{args.eligibility}" if args.eligibility != "cues" else ""))
-    with open(os.path.join(args.out, f"results_{tag}.json"), "w") as fh:
+    tag = run_tag(res)
+    path = os.path.join(args.out, f"results_{tag}.json")
+    # A filename that does not encode every cell-defining axis loses runs
+    # silently -- the array job still reports COMPLETED, and the loss only
+    # shows up later as a cell with fewer seeds than were asked for. Compare
+    # against whatever is already there and refuse rather than overwrite.
+    # Re-running an IDENTICAL cell stays allowed: that is how a wave tops up
+    # seeds without knowing which ones exist.
+    if os.path.exists(path):
+        try:
+            prev = json.load(open(path))
+        except (ValueError, OSError):
+            prev = {}
+        clash = {k: (prev.get(k), res.get(k)) for k in CELL_FIELDS
+                 if prev.get(k) != res.get(k)}
+        if clash:
+            raise SystemExit(
+                f"error: {os.path.basename(path)} already holds a DIFFERENT cell -- "
+                + "; ".join(f"{k}: on disk {o!r}, this run {n!r}"
+                            for k, (o, n) in sorted(clash.items()))
+                + ". The filename does not distinguish these, so writing would "
+                  "destroy the run on disk. Add the differing axis to `tag`.")
+    with open(path, "w") as fh:
         json.dump(res, fh, indent=1)
     # Per-frame predictions keyed on manifest row: RGB and depth cells of one
     # (policy, seed) score byte-identical frame sets, so this is what a McNemar
