@@ -1594,13 +1594,49 @@ after the fact, so nothing broke. The venv rule to follow: **`pip install
 --no-deps`** for anything added after the TF install, and if a CC-patched wheel
 does get replaced, `pip install --force-reinstall "packaging==24.1+computecanada"`.
 
+### 13.7 Bootstrap intervals depended on processing order
+
+`hiride_stats.py` seeded one generator (`default_rng(--seed)`) and consumed it
+sequentially across every cell, so an interval depended on how many OTHER cells
+happened to be bootstrapped first. Landing wave 16 — which touched
+`scale_removed` and `interior_only`, not `sil_scaled` — moved the `sil_scaled`
+bound from +0.19 to +0.10 pp with its own data untouched. Every other row
+shifted too.
+
+Fixed: `boot_rng(base_seed, key)` derives an independent stream from the
+quantity's own key (blake2b of the cell key), so an interval is a function of
+that cell's data and `--seed` and nothing else. Verified: identical interval for
+the same key after 40 unrelated cells are bootstrapped in between.
+
+`cluster_boot` is also vectorised — the mean over a resampled subject set is
+`sum(correct counts) / sum(frame counts)`, two gathers and two row-sums instead
+of concatenating frame arrays per draw. Byte-identical to the loop it replaces
+(verified draw-for-draw), and fast enough that `--boot` default went 2000 →
+20000, halving the Monte-Carlo spread of the 2.5 % bound from 0.064 to 0.031 pp.
+
+**Every interval in the paper must be regenerated with this version.** Earlier
+`stats_final.json` files carry order-dependent intervals.
+
 ### 13.6 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
    is quoted.** Then `bash collect_all.sh` and re-render figures.
-2. **`sil_scaled +7.89 pp [+0.19, +15.42]` at R4 is the number most likely to
-   move** — its baseline was a 2-seed cell until wave 16, and the interval
-   barely excludes zero. It is currently the only R4 contrast whose
-   subject-level interval clears zero, so the claim in §0 line 4 depends on it.
+2. **`sil_scaled` vs `full` at R4 is a knife-edge claim — treat it as
+   marginal, not significant.** Wave 16 left the contrast itself unchanged at
+   **+7.89 pp**, but the interval moved from `[+0.19, +15.42]` to
+   `[+0.10, +15.65]` on identical data, which is what exposed the ordering bug
+   in §13.7. With that fixed and `--boot 20000`, the Monte-Carlo spread of the
+   2.5 % bound is about **0.03 pp** — against a bound sitting at roughly
+   **+0.1 pp**. So the interval does exclude zero, but by an amount comparable
+   to bootstrap noise, and it is the ONLY R4 contrast that clears zero at all.
+
+   **Do not write "significantly better than the full metric-depth frame."**
+   What the data supports: the normalised binary silhouette is the best R4
+   condition measured, and its advantage over the full frame is positive with a
+   lower bound indistinguishable from zero. §0 line 4 currently overstates this
+   and must be rewritten before submission. The honest version of the paper's
+   claim does not need it: the collapse itself, and the fact that what survives
+   is framing-normalised outline rather than metric depth, both stand on the
+   condition ordering without needing this one interval to clear zero.
 3. Figures 1–5 are final in form; only their inputs change.
 4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.

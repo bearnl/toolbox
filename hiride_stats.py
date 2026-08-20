@@ -23,6 +23,7 @@ import json
 import argparse
 from math import lgamma
 
+import hashlib
 import numpy as np
 
 from hiride_keys import cell_key, cond_key, arch_key
@@ -49,15 +50,36 @@ def load_cells(runs):
     return cells
 
 
+def boot_rng(base_seed, key):
+    """An independent generator per bootstrapped quantity, keyed on its identity.
+
+    A single shared generator consumed in loop order makes every interval depend
+    on how many OTHER cells happened to be processed first. Landing a wave that
+    touches unrelated cells then shifts intervals that no new evidence bears on:
+    adding three cells on 2026-08-20 moved the headline `sil_scaled` bound from
+    +0.19 to +0.10 pp with its own data unchanged. Deriving the stream from the
+    cell's own key makes an interval a function of that cell's data and the
+    global --seed, and nothing else.
+    """
+    h = hashlib.blake2b(repr(key).encode(), digest_size=8).digest()
+    return np.random.default_rng([base_seed, int.from_bytes(h, "big")])
+
+
 def cluster_boot(correct, subj, rng, n_boot):
-    """Bootstrap frame accuracy by resampling SUBJECTS with replacement."""
-    subjects = np.unique(subj)
-    per = {s: correct[subj == s] for s in subjects}
-    stats = np.empty(n_boot)
-    for b in range(n_boot):
-        pick = rng.choice(subjects, size=len(subjects), replace=True)
-        c = np.concatenate([per[s] for s in pick])
-        stats[b] = c.mean()
+    """Bootstrap frame accuracy by resampling SUBJECTS with replacement.
+
+    Vectorised: the mean over a resampled set of subjects is
+    sum(their correct counts) / sum(their frame counts), so the whole bootstrap
+    is two gathers and two row-sums -- no per-draw concatenation of frame
+    arrays. Exactly equal to the loop it replaces, and fast enough that --boot
+    is no longer a reason to keep the resample count low.
+    """
+    subjects, inv = np.unique(subj, return_inverse=True)
+    k = len(subjects)
+    sums = np.bincount(inv, weights=np.asarray(correct, dtype=np.float64), minlength=k)
+    cnts = np.bincount(inv, minlength=k).astype(np.float64)
+    pick = rng.integers(0, k, size=(n_boot, k))
+    stats = sums[pick].sum(axis=1) / cnts[pick].sum(axis=1)
     return float(np.percentile(stats, 2.5)), float(np.percentile(stats, 97.5))
 
 
@@ -81,11 +103,10 @@ def mcnemar_exact(b, c):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True)
-    ap.add_argument("--boot", type=int, default=2000)
+    ap.add_argument("--boot", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--json", default=None)
     args = ap.parse_args()
-    rng = np.random.default_rng(args.seed)
 
     cells = load_cells(args.runs)
     if not cells:
@@ -109,7 +130,9 @@ def main():
         accs, los, his, per_subj = [], [], [], []
         for c in g:
             correct = (c["pred"] == c["truth"]).astype(float)
-            lo, hi = cluster_boot(correct, c["subj"], rng, args.boot)
+            lo, hi = cluster_boot(correct, c["subj"],
+                                  boot_rng(args.seed, gkey + (c["meta"]["seed"],)),
+                                  args.boot)
             accs.append(correct.mean()); los.append(lo); his.append(hi)
             per_subj.append(np.mean([correct[c["subj"] == s].mean() for s in np.unique(c["subj"])]))
         m = g[0]["meta"]
@@ -162,7 +185,8 @@ def main():
         b = int((r_ok & ~d_ok).sum()); c = int((~r_ok & d_ok).sum())
         p = mcnemar_exact(b, c)
         diff = r_ok.astype(float) - d_ok.astype(float)
-        lo, hi = cluster_boot(diff, R["subj"], rng, args.boot)
+        lo, hi = cluster_boot(diff, R["subj"],
+                              boot_rng(args.seed, ("paired",) + key), args.boot)
         rec = dict(policy=policy, guard=guard, arch=arch, condition=cond, seed=seed,
                    rgb=float(r_ok.mean()),
                    depth=float(d_ok.mean()), diff=float(diff.mean()), ci=[lo, hi],
@@ -208,7 +232,8 @@ def main():
         c_ok = C["pred"] == C["truth"]; f_ok = F["pred"] == F["truth"]
         b = int((c_ok & ~f_ok).sum()); c = int((~c_ok & f_ok).sum())
         diff = c_ok.astype(float) - f_ok.astype(float)
-        lo, hi = cluster_boot(diff, C["subj"], rng, args.boot)
+        lo, hi = cluster_boot(diff, C["subj"],
+                              boot_rng(args.seed, ("cond",) + key), args.boot)
         rec = dict(policy=policy, guard=guard, modality=mod, arch=arch, condition=cond, seed=seed,
                    cond_acc=float(c_ok.mean()), full_acc=float(f_ok.mean()), diff=float(diff.mean()),
                    bits=meta.get("bits", 16), ci=[lo, hi], mcnemar_p=mcnemar_exact(b, c))
