@@ -677,6 +677,12 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--guard", type=int, default=150)
     ap.add_argument("--ref-guard", type=int, default=150)
+    ap.add_argument("--ref-eligibility", choices=("match", "cues"), default="match",
+                    help="which frame filter the R1 match_ntrain reference is computed "
+                         "under. 'match' uses --eligibility (default); 'cues' uses the "
+                         "standard filter even when --eligibility is full_body, which is "
+                         "required at guard 150 because the full-body filter starves three "
+                         "recordings of training frames outright.")
     ap.add_argument("--epochs", type=int, default=60)
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=1e-4)
@@ -741,18 +747,33 @@ def main():
     tf.keras.mixed_precision.set_global_policy("mixed_float16")
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
+    ref_keep = None
     if args.eligibility == "all":
         keep = np.ones(len(man["subject"]), dtype=bool)
     else:
         cues = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
-        keep = eligible_mask(cues["cues"], [str(f) for f in cues["feats"]],
+        feats = [str(f) for f in cues["feats"]]
+        keep = eligible_mask(cues["cues"], feats,
                              full_body=(args.eligibility == "full_body"))
+        if args.ref_eligibility == "cues":
+            ref_keep = eligible_mask(cues["cues"], feats, full_body=False)
 
     kw = {}
     if args.policy.startswith("R1"):
+        # The reference counts that match_ntrain subsamples toward. Under
+        # --eligibility full_body, computing them from the SAME mask starves
+        # three recordings of training frames entirely (guard 150 plus the
+        # full-body filter leaves nothing), and block_train_counts refuses
+        # rather than silently dropping those classes. --ref-eligibility cues
+        # takes the reference from the standard mask instead: match_ntrain only
+        # ever subsamples, so a recording with fewer full-body frames than the
+        # target simply keeps all of them. The full-body arm therefore trains on
+        # AT MOST what its cues partner does -- conservative, so a win cannot be
+        # attributed to extra data.
         kw = dict(guard=args.guard,
-                  match_ntrain=block_train_counts(man, guard=args.ref_guard,
-                                                  seed=0, keep=keep))
+                  match_ntrain=block_train_counts(
+                      man, guard=args.ref_guard, seed=0,
+                      keep=ref_keep if ref_keep is not None else keep))
     tr, va, te = make_split(man, args.policy, seed=args.seed, keep=keep, **kw)
     info = describe_split(man, tr, va, te)
 
@@ -901,7 +922,7 @@ def main():
         feeding="sequence_v2",                  # code-path provenance for collate
         depth_clip_mm=DEPTH_CLIP_MM, bits=args.bits, depth_slab_mm=args.depth_slab_mm,
         frames=args.frames, encoding=args.depth_encoding, erode=args.erode, head=args.head,
-        eligibility=args.eligibility,
+        eligibility=args.eligibility, ref_eligibility=args.ref_eligibility,
         augment=args.augment, **fused,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),

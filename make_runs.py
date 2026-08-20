@@ -296,7 +296,14 @@ WAVE14 = dict(
 # The clean test is the within-bin contrast in hiride_range_profile.py --preds,
 # where distance is held fixed. Report both or neither. 30 cells.
 WAVE15 = dict(
-    policies=[("R1_block", "--guard 150"), ("R4_cross_session", "")],
+    # The R1 arm needs --ref-eligibility cues: at guard 150 the full-body filter
+    # leaves three recordings with no training frames at all, and
+    # block_train_counts refuses to build a reference that would silently drop
+    # those classes. Taking the reference from the standard mask is conservative
+    # -- match_ntrain only subsamples, so the full-body arm trains on at most
+    # what its partner does.
+    policies=[("R1_block", "--guard 150 --ref-eligibility cues"),
+              ("R4_cross_session", "")],
     cells=[
         ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10"),
         ("interior_only", "depth", "--head stripe --augment 8 --test-fuse 10"),

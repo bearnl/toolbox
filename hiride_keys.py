@@ -19,7 +19,8 @@ here in the same commit.
 # Every field that participates in cell identity, with the value that means
 # "default, omit from the key". Anything not listed here is metadata.
 AXES = dict(bits=16, frames=1, encoding="raw", head="gap", augment=0, test_fuse=1,
-            erode=2, depth_slab_mm=6000.0, init=None, eligibility="cues")
+            erode=2, depth_slab_mm=6000.0, init=None, eligibility="cues",
+            ref_eligibility="match")
 
 
 def arch_key(r):
@@ -33,6 +34,9 @@ def arch_key(r):
         arch += f"/aug{r['augment']}"
     if r.get("test_fuse", 1) > 1:
         arch += f"/tf{r['test_fuse']}"
+    # changes how many training frames each recording contributes at R1
+    if r.get("ref_eligibility", "match") != "match":
+        arch += f"/ref{r['ref_eligibility']}"
     return arch
 
 
