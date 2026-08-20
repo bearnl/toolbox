@@ -62,43 +62,64 @@ def main():
         print(f"{s:<20s}{q[0]:>8.0f}{q[1]:>8.0f}{q[2]:>8.0f}{q[4]-q[3]:>8.0f}")
 
     ok = keep & np.isfinite(p_med) & (p_med > 0)
+
+    # How much of the R4 TEST set sits at ranges the R4 TRAINING set barely
+    # covers? A model cannot be blamed for frames drawn from a distance it never
+    # saw, and fig 5's worst probe bin (0-2000 mm, 5.97 %) is exactly there.
+    trn = ok & (seq == "Training")
+    tst = ok & (seq == "Testing/Walking")
+    lo, hi = np.percentile(p_med[trn], [5, 95])
+    below, above = float((p_med[tst] < lo).mean()), float((p_med[tst] > hi).mean())
+    print(f"\nR4 range overlap: training p05-p95 = {lo:.0f}-{hi:.0f} mm")
+    print(f"  test frames BELOW the training p05: {100 * below:5.1f} %")
+    print(f"  test frames ABOVE the training p95: {100 * above:5.1f} %")
+    print(f"  test frames inside the training range: "
+          f"{100 * (1 - below - above):5.1f} %")
+
     print(f"\nper-feature decomposition over {len(cols)} reported columns "
-          f"({int(ok.sum())} frames, within-subject and within-corpus):\n")
-    hdr = (f"{'feature':<18s}{'between-SD':>12s}{'within-SD':>11s}"
-           f"{'dist-R2':>9s}{'slope/m':>10s}{'recoverable':>12s}")
+          f"({int(ok.sum())} frames):\n")
+    print("A GLOBAL slope, not a per-subject one. Fitting each subject its own line "
+          "\nuses that subject's identity, so it is not a correction anyone could apply "
+          "\nat test time -- and Training/Still subjects barely move, leaving those fits "
+          "\nill-conditioned (the RankWarnings an earlier version emitted). This is a "
+          "\nfixed-effects estimate: subtract each subject's own mean, then regress the "
+          "\ncentred feature on centred distance pooled over everyone. One slope, "
+          "\napplicable to a stranger.\n")
+    hdr = (f"{'feature':<18s}{'between-SD':>12s}{'within-SD':>11s}{'slope/m':>10s}"
+           f"{'var expl':>10s}{'SNR gain':>10s}")
     print(hdr); print("-" * len(hdr))
     for c in cols:
-        vals, slopes, r2s, betw = [], [], [], []
-        resid_all, raw_all = [], []
-        for s in sorted(set(seq)):
-            for u in sorted(set(subj[ok & (seq == s)])):
-                m = ok & (seq == s) & (subj == u)
+        yc, xc, betw = [], [], []
+        for s_ in sorted(set(seq)):
+            for u in sorted(set(subj[ok & (seq == s_)])):
+                m = ok & (seq == s_) & (subj == u)
                 if m.sum() < args.min_frames:
                     continue
                 y, x = full[m, c].astype(np.float64), p_med[m] / 1000.0
-                if not np.isfinite(y).all() or y.std() == 0 or x.std() == 0:
+                if not np.isfinite(y).all():
                     continue
-                b = np.polyfit(x, y, 1)
-                r = y - np.polyval(b, x)
-                slopes.append(b[0])
-                r2s.append(1.0 - r.var() / y.var())
-                raw_all.append(y - y.mean()); resid_all.append(r - r.mean())
                 betw.append(y.mean())
+                yc.append(y - y.mean()); xc.append(x - x.mean())
         if len(betw) < 5:
             continue
+        Y, X = np.concatenate(yc), np.concatenate(xc)
+        vx = float((X * X).sum())
+        slope = float((X * Y).sum() / vx) if vx > 0 else 0.0
+        w_sd = float(Y.std())
+        w_sd_c = float((Y - slope * X).std())
         b_sd = float(np.std(betw))
-        w_sd = float(np.std(np.concatenate(raw_all)))
-        w_sd_corr = float(np.std(np.concatenate(resid_all)))
-        gain = (w_sd / w_sd_corr - 1.0) * 100 if w_sd_corr > 0 else 0.0
-        print(f"{names[c]:<18s}{b_sd:>12.2f}{w_sd:>11.2f}"
-              f"{np.median(r2s):>9.3f}{np.median(slopes):>10.2f}{gain:>11.1f}%")
+        expl = 1.0 - (w_sd_c ** 2) / max(w_sd ** 2, 1e-12)
+        gain = (w_sd / w_sd_c - 1.0) * 100 if w_sd_c > 0 else 0.0
+        print(f"{names[c]:<18s}{b_sd:>12.2f}{w_sd:>11.2f}{slope:>10.2f}"
+              f"{100 * expl:>9.1f}%{gain:>9.1f}%")
 
-    print("\nREAD: `between-SD` is the identity signal; `within-SD` is what it must beat. "
-          "\n`dist-R2` is the share of within-subject variance that standing distance alone "
-          "\nexplains -- variance that is not noise but a correctable bias. `recoverable` is "
-          "\nthe percentage improvement in signal-to-noise from removing the linear drift. "
-          "\nAnything above a few percent means these features are not as range-invariant as "
-          "\ntheir units imply, and a per-frame correction would lift every metric result.")
+    print("\nREAD: `between-SD` is the identity signal; `within-SD` is what it must beat."
+          "\n`slope/m` is how far the feature drifts per metre of standing distance -- for a"
+          "\nquantity claimed to be in millimetres in a gravity-aligned frame, it should be"
+          "\nnear zero. `SNR gain` is what removing that one global slope buys. Compare the"
+          "\ndrift over the test range against `between-SD`: a feature drifting further"
+          "\nacross the walk than it varies between people is measuring the range, not the"
+          "\nperson.")
 
 
 if __name__ == "__main__":
