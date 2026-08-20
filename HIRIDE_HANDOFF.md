@@ -1670,7 +1670,103 @@ two sessions per subject, at 25 fps or better.** Do not fit gait inside
 `Walking` to have a number — it would measure the recording, which is the exact
 error this whole re-run exists to correct.
 
-### 13.6 Open items
+### 13.9 Depth IS clothing-invariant — the R3→R4 decomposition
+
+Author's question, 2026-08-21: *if depth is colour/clothing invariant, R1–R3
+should not differ so much from R4.* The inference is right, and the mechanism
+suite already answers it. Split the conditions by whether they contain the
+person or the room:
+
+| depth condition | R3 | R4 | Δ | | rgb R3 | rgb R4 | Δ |
+|---|---|---|---|---|---|---|---|
+| **background-carrying** | | | | | | | |
+| full frame | 34.82 | 6.70 | −28.1 | | 79.51 | 5.59 | −73.9 |
+| person removed (plate) | 38.57 | 4.92 | −33.7 | | 41.11 | 3.00 | −38.1 |
+| person removed (hole) | 35.80 | 5.69 | −30.1 | | 55.31 | 5.60 | −49.7 |
+| **person-only** | | | | | | | |
+| person only | 8.65 | 7.87 | **−0.8** | | 47.81 | 14.46 | −33.4 |
+| person, re-centred | 9.08 | 11.92 | **+2.8** | | 48.88 | 14.45 | −34.4 |
+| size+position removed | 13.76 | 12.45 | **−1.3** | | 66.77 | 17.72 | −49.1 |
+| silhouette | 7.48 | 10.06 | **+2.6** | | — | — | |
+| silhouette, size+pos removed | 13.71 | 14.59 | **+0.9** | | — | — | |
+| metric 3D scalars (mm) | 15.56 | 19.04 | **+3.5** | | — | — | |
+
+**Every person-based depth representation is flat or RISING across the session
+change. Every background-carrying one loses ~30 pp.** Exactly what a
+clothing-invariant signal must do. RGB does the opposite: its person-only rows
+fall 33–49 pp, because what they encode is clothing.
+
+Three consequences the paper should state directly:
+
+1. **Depth's 34.82 % at R3 is not a person-identification result.** Deleting the
+   person entirely (`bg_plate`) scores HIGHER, 38.57 %. The full-frame depth
+   model at R3 is reading the room, which is why it lands BELOW the person-only
+   conditions once the room changes.
+2. **The honest depth curve is not 62 → 35 → 6.7.** It is `sil_scaled`
+   52.7 → 13.7 → 14.6, or metric 67.97 → 15.56 → 19.04 where R4 actually beats
+   R3 (R3 is data-starved at ~65 frames/subject).
+3. **RGB's whole advantage over depth is clothing.** On `scale_removed` the gap
+   is **53.0 pp at R3** (66.77 vs 13.76) and **5.3 pp at R4** (17.72 vs 12.45);
+   with the corrected head it closes to 18.53 vs 18.01.
+
+The remaining real drop is **R1→R3**, and it is not clothing either — same
+outfit throughout. It is recording identity: within one recording a subject
+holds a near-constant standing distance and stance, so even millimetre
+measurements carry a per-recording bias the classifier memorises. Adding
+`stand_dist_mm` back drops R1 67.97 → 57.59, confirming it from the other side.
+R1 measures "is this the same recording of this person"; R3/R4 measure "is this
+this person".
+
+### 13.10 Metric features and the CNN are COMPLEMENTARY — but score fusion does not capture it
+
+`hiride_fuse.py` joins the CNN's stored per-frame posteriors (`cm_*.npz`) to a
+RandomForest on the 12 metric scalars over the same split, on the shared frame
+set. Nothing is retrained on the CNN side. Sanity check passes: the `cnn`
+column reproduces every published R4 number to the decimal (14.60/12.45/11.92).
+
+| R4 condition | cnn | metric | fused (w=½) | geo (log) | oracle | rescued |
+|---|---|---|---|---|---|---|
+| `sil_scaled` | 14.60 | 18.83 | 19.21 | 22.13 | **27.62** | 15.2 % |
+| `scale_removed` | 12.45 | 18.83 | 17.08 | 19.54 | **26.18** | 15.7 % |
+| `person_centred` | 11.92 | 18.83 | 15.48 | 17.39 | **27.04** | 17.2 % |
+
+**What is established.** `oracle − metric` is **+8.79 [+5.11, +13.08]**,
+**+7.35 [+3.67, +11.76]**, **+8.22 [+3.09, +14.64]** — every interval clear of
+zero. The metric model correctly identifies ~1 frame in 6 that the CNN gets
+wrong. So **~19 % is the ceiling of each representation separately, NOT the
+information content of a Kinect v1 frame of a person.** There is roughly 8 pp
+more identity in the frame than either method extracts.
+
+**What is NOT established.** No fixed-weight score-level rule captures it.
+`geo − metric` is **+3.31 [−2.00, +8.72]**, **+0.71 [−5.49, +7.00]**,
+**−1.44 [−8.75, +6.33]**; `fused − metric` is negative in two of three. **Do not
+quote 22.13 % as an improvement on 19.04 %** — the interval says
+[−2.00, +8.72], and n = 28 subjects is the binding constraint as always. Both
+fusion rules were fixed in advance, so nothing here is tuned; the failure is of
+the rule, not of the protocol.
+
+**The honest sentence for the paper:** the two representations fail on
+different frames, and the gap between what either achieves alone (~19 %) and
+what one of them achieves per frame (~27 %) is real and significant — but a
+simple posterior combination does not realise it.
+
+**Next test, and what it can show.** Feature-level fusion: retrain the CNN with
+the 12 metric scalars concatenated at the head, so the network can learn a
+frame-dependent combination rather than a global weight. The oracle bound says
+~8 pp of headroom exists; whether a joint model reaches it is open. A cheaper
+alternative that would license honest weight TUNING is to have the trainer save
+posteriors for validation rows as well — currently only test rows are stored,
+which is why no mixing weight could be selected without touching the test set.
+
+**A note on process.** The first run of this experiment was garbage and said so
+in its own output — 15 "seeds" in a 5-seed condition, one row with 2,933 test
+frames beside rows with 5,642. `cnn_cells()` compared `m["condition"]`, the RAW
+string, so `scale_removed@1b`, `/f10` and `/dsil` all matched `scale_removed`.
+That is the **eighth** instance of this campaign's signature bug, and the second
+this session — and `hiride_keys.py` had existed for weeks specifically to
+prevent it. **Import `cond_key`/`arch_key`. Never re-derive cell identity.**
+
+### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
    is quoted.** Then `bash collect_all.sh` and re-render figures.
@@ -1693,7 +1789,13 @@ error this whole re-run exists to correct.
 
 3. Figures 1–5 are final in form; only their inputs change.
 4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.
-5. **Gait is closed — negative, see §13.8.** The best remaining lever is
-   §12.8 item 4: metric 3D features (19.04 % at R4) and the CNN (18.01 %) are
-   disjoint representations of the same frames and have never been given to
-   each other. Nothing in §13.8 bears on that.
+5. **Gait is closed — negative, §13.8.**
+6. **Score-level metric+CNN fusion is closed — complementarity confirmed, the
+   fusion itself not significant (§13.10).** The open follow-up is
+   FEATURE-level fusion: concatenate the 12 metric scalars at the CNN head and
+   retrain. ~8 pp of headroom is proven to exist by the oracle bound; whether a
+   joint model reaches it is the question. Cheap: one wave, R4 + R3, three
+   conditions, 5 seeds.
+7. Have the trainer save posteriors for VALIDATION rows, not just test rows.
+   Without them no fusion weight can be chosen without touching the test set,
+   which is what forced the fixed-weight rules in §13.10.
