@@ -104,7 +104,12 @@ def main():
     have = ~np.isnan(full[:, 0])
     keep = keep_cue & have
     print(f"[load] {int(have.sum())} frames have metric features; "
-          f"{int(keep.sum())} also pass the cue eligibility filter")
+          f"{int(keep.sum())} also pass eligibility={args.eligibility}")
+    seqs = np.asarray(man["seq"], dtype=str)
+    for sname in sorted(set(seqs)):
+        m = seqs == sname
+        print(f"  {sname:<18s} {int((keep & m).sum()):>6d} / {int(m.sum()):>6d} kept "
+              f"({100 * (keep & m).sum() / max(m.sum(), 1):5.1f} %)")
 
     bone = [i for i, n in enumerate(names) if n.startswith("bone_")]
     nuis = [i for i, n in enumerate(names) if n in ("stand_dist_mm", "ground",
@@ -143,9 +148,17 @@ def main():
                   f"{100 * inband.mean():.1f} % of test frames")
             te = te[inband]
             if len(te) < 50:
+                print(f"{pol:<20s} SKIPPED: only {len(te)} test frames after "
+                      f"range-match")
                 continue
         yte = np.array([cmap[s] for s in man["subject"][te]])
-        if len(te) < 50:
+        if len(te) < 50 or len(set(ytr.tolist())) < 2:
+            # A silent `continue` here dropped every rung under
+            # --eligibility full_body and printed an empty table, which reads
+            # like "no effect" rather than "not runnable". Say which it is.
+            print(f"{pol:<20s} SKIPPED: {len(tr)} train / {len(te)} test frames "
+                  f"survive eligibility={args.eligibility} AND having metric "
+                  f"features ({len(set(ytr.tolist()))} classes) -- need >=50 test")
             continue
         maj = float(np.bincount(yte).max() / len(yte))
         Xall = full
