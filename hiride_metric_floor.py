@@ -61,11 +61,39 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--perm-draws", type=int, default=5)
+    # Both default to prior behaviour, so an un-flagged run reproduces the
+    # published 19.04 % exactly.
+    ap.add_argument("--eligibility", choices=("cues", "full_body"), default="cues",
+                    help="full_body scores only frames whose whole body is in "
+                         "shot. hiride_metric_bias.py measures stature_mm "
+                         "drifting 89.5 mm per metre of standing distance "
+                         "against a between-subject SD of 105 mm -- because a "
+                         "clipped body is a SHORTER body, so the height "
+                         "features partly encode range. w_15 and w_30, which "
+                         "need no vertical extent, do not drift at all.")
+    ap.add_argument("--detrend", action="store_true",
+                    help="remove one global fixed-effects slope per feature "
+                         "against standing distance, fitted on TRAIN rows only "
+                         "and applied to both sides. Not the same as feeding "
+                         "stand_dist_mm as a feature, which lets the model use "
+                         "range as a shortcut and cost 10 pp at R1 (12.1); "
+                         "this removes its influence instead.")
+    ap.add_argument("--range-match", action="store_true",
+                    help="score only test frames inside the training p05-p95 "
+                         "standing-distance band. 36.3 %% of R4 test frames "
+                         "fall outside it, so the headline number is partly a "
+                         "model being asked about distances it never saw. "
+                         "Reports the retained fraction; the resulting accuracy "
+                         "answers a DIFFERENT question and is not comparable "
+                         "to the unrestricted number.")
     args = ap.parse_args()
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
     z = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
-    keep_cue = eligible_mask(z["cues"], [str(f) for f in z["feats"]])
+    cue_feats = [str(f) for f in z["feats"]]
+    keep_cue = eligible_mask(z["cues"], cue_feats,
+                             full_body=(args.eligibility == "full_body"))
+    p_med = z["cues"][:, cue_feats.index("p_med")].astype(np.float64)
 
     mf = np.load(os.path.join(args.prep, "metric_features.npz"), allow_pickle=False)
     F, names, rows = mf["feats"], [str(n) for n in mf["names"]], mf["manifest_row"]
@@ -108,20 +136,54 @@ def main():
         ytr = np.array([cmap[s] for s in man["subject"][tr]])
         m_te = np.array([s in cmap for s in man["subject"][te]])
         te = te[m_te]
+        if args.range_match:
+            lo, hi = np.percentile(p_med[tr], [5, 95])
+            inband = (p_med[te] >= lo) & (p_med[te] <= hi)
+            print(f"{pol:<20s} range-match {lo:.0f}-{hi:.0f} mm keeps "
+                  f"{100 * inband.mean():.1f} % of test frames")
+            te = te[inband]
+            if len(te) < 50:
+                continue
         yte = np.array([cmap[s] for s in man["subject"][te]])
         if len(te) < 50:
             continue
         maj = float(np.bincount(yte).max() / len(yte))
+        Xall = full
+        if args.detrend:
+            # One slope per feature, fitted on TRAIN rows with each subject
+            # centred on its own mean, so the fit cannot borrow identity and is
+            # well-conditioned even though many subjects barely move. Applied to
+            # train and test alike; test rows never inform the slope.
+            Xall = full.copy()
+            zt = p_med[tr] / 1000.0
+            for j in range(full.shape[1]):
+                yc, xc = [], []
+                for u in sorted(set(man["subject"][tr].tolist())):
+                    sm = man["subject"][tr] == u
+                    if sm.sum() < 20:
+                        continue
+                    yy = full[tr][sm, j].astype(np.float64)
+                    if not np.isfinite(yy).all():
+                        continue
+                    yc.append(yy - yy.mean()); xc.append(zt[sm] - zt[sm].mean())
+                if not yc:
+                    continue
+                Y, X = np.concatenate(yc), np.concatenate(xc)
+                vx = float((X * X).sum())
+                if vx <= 0:
+                    continue
+                Xall[:, j] = full[:, j] - float((X * Y).sum() / vx) * (p_med / 1000.0)
+
         for sname, cols in SETS.items():
             accs, pers = [], []
             for s in range(args.seeds):
-                a, p, imp, _ = fit_eval(full[tr][:, cols], ytr, full[te][:, cols], yte, s)
+                a, p, imp, _ = fit_eval(Xall[tr][:, cols], ytr, Xall[te][:, cols], yte, s)
                 accs.append(a); pers.append(p)
             nulls = []
             for d in range(args.perm_draws):
                 rng = np.random.default_rng(5000 + d)
-                a, _, _, _ = fit_eval(full[tr][:, cols], rng.permutation(ytr),
-                                      full[te][:, cols], yte, d)
+                a, _, _, _ = fit_eval(Xall[tr][:, cols], rng.permutation(ytr),
+                                      Xall[te][:, cols], yte, d)
                 nulls.append(a)
             print(f"{pol:<20s}{sname:<17s}{args.seeds:>2d}"
                   f"{100 * np.mean(accs):8.2f}%{100 * np.mean(pers):9.2f}%"
@@ -134,7 +196,7 @@ def main():
                 chance=1.0 / len(classes), majority=maj,
                 n_train=int(len(tr)), n_test=int(len(te)))
         # which metric features carry it
-        _, _, imp, _ = fit_eval(full[tr][:, metric], ytr, full[te][:, metric], yte, 0)
+        _, _, imp, _ = fit_eval(Xall[tr][:, metric], ytr, Xall[te][:, metric], yte, 0)
         if imp is not None:
             top = np.argsort(imp)[::-1][:6]
             print(f"{'':<20s}{'top metric cues':<17s}"
