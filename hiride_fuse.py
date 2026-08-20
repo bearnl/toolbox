@@ -56,6 +56,7 @@ import numpy as np
 
 from hiride_data import load_manifest, make_split, eligible_mask
 from hiride_keys import cond_key, arch_key
+from hiride_metric import BASE_METRIC
 from hiride_stats import cluster_boot, boot_rng
 
 
@@ -116,8 +117,8 @@ def load_metric(prep, man):
     full = np.full((len(man["frame"]), F.shape[1]), np.nan, dtype=np.float32)
     full[rows] = F
     have = ~np.isnan(full[:, 0])
-    nuis = {"stand_dist_mm", "ground", "n_points", "valid_frac", "top_clip", "bot_clip"}
-    cols = [i for i, n in enumerate(names) if n not in nuis and not n.startswith("bone_")]
+    # pinned to the 12 published columns -- see hiride_metric.BASE_METRIC
+    cols = [i for i, n in enumerate(names) if n in BASE_METRIC]
     print(f"[load] {int(have.sum())} frames with metric features, "
           f"{int((keep_cue & have).sum())} also cue-eligible; "
           f"using {len(cols)} metric columns")

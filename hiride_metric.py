@@ -117,6 +117,26 @@ def read_skel(path):
     return None
 
 
+# The 12 columns the published numbers were computed from (19.04 % at R4,
+# 67.97 % at R1). PINNED: adding features to the npz must not silently change
+# what "metric" means, or every earlier number becomes unreproducible. New
+# features join `shape`, and `metric+shape` is where they are evaluated.
+BASE_METRIC = ("depth_extent_mm", "height_p05", "height_p50", "stature_mm",
+               "surface_area_m2", "volume_proxy_l",
+               "w_15", "w_30", "w_45", "w_60", "w_75", "w_90")
+SHAPE_PREFIXES = ("hw_", "ht_", "hc_", "ha_", "r_")
+NUISANCE = ("stand_dist_mm", "ground", "n_points", "valid_frac",
+            "top_clip", "bot_clip")
+
+# Offsets below the crown, in millimetres, at which the body is measured.
+# Absolute, not fractions of stature: a fraction of a clipped stature points at
+# the wrong anatomy, which is the defect these replace.
+HEAD_OFFSETS_MM = (100, 200, 300, 400, 500, 600, 700, 800)
+BAND_HALF_MM = 40.0
+# Scale-free width ratios: shoulder-ish over hip-ish, and two neighbours.
+SHAPE_RATIOS = ((200, 700), (200, 400), (400, 700))
+
+
 def frame_features(depth, user, ground):
     """One frame -> dict of metric features in a gravity-aligned frame."""
     m = (user > 0) & (depth > 0)
@@ -170,6 +190,47 @@ def frame_features(depth, user, ground):
     area = float(np.sum((z / FX) * (z / FY))) / 1e6                 # m^2
     out["surface_area_m2"] = area
     out["volume_proxy_l"] = area * out["depth_extent_mm"]           # m^2 * mm = litres
+
+    # ---- HEAD-ANCHORED BAND FEATURES ---------------------------------------
+    # The w_XX block above anchors at `base` -- the bottom of the VISIBLE body
+    # -- and scales by `stature`. Both are corrupted the moment the feet leave
+    # frame, which happens in 98 % of close-range frames: `base` becomes
+    # mid-shin, `stature` shrinks, and w_45 lands on a different body part
+    # depending only on how much got cut off. hiride_metric_bias.py measures the
+    # consequence -- stature_mm drifting 89.5 mm per metre of standing distance
+    # against a 105 mm between-subject SD, while w_15 and w_30, which sit near
+    # the anchor and barely move with it, drift by ~0.
+    #
+    # These bands are measured DOWNWARD FROM THE CROWN in absolute millimetres.
+    # The crown is visible far more often than the feet (top-touch 0.43 vs
+    # bottom-touch 0.98 at close range), and an offset in mm is anatomically
+    # stable however much of the legs is missing. `top_clip` already flags the
+    # frames where even this anchor fails.
+    crown = float(np.percentile(h, 99.5))
+    for d in HEAD_OFFSETS_MM:
+        sel = (h >= crown - d - BAND_HALF_MM) & (h <= crown - d + BAND_HALF_MM)
+        if sel.sum() <= 30:
+            out[f"hw_{d:03d}"] = out[f"ht_{d:03d}"] = 0.0
+            out[f"hc_{d:03d}"] = out[f"ha_{d:03d}"] = 0.0
+            continue
+        w = float(np.percentile(lat[sel], 97.5) - np.percentile(lat[sel], 2.5))
+        t = float(np.percentile(dep[sel], 97.5) - np.percentile(dep[sel], 2.5))
+        out[f"hw_{d:03d}"] = w                       # width, mm
+        out[f"ht_{d:03d}"] = t                       # thickness, mm -- NEW axis:
+        # the old set had ONE global depth_extent_mm, so body thickness was a
+        # single number for the whole person. Chest depth against waist depth is
+        # a standard anthropometric discriminator and costs nothing here.
+        a, b = w / 2.0, t / 2.0
+        # Ramanujan's ellipse perimeter: the circumference an anthropometrist
+        # would tape, from the two semi-axes the sensor can actually see.
+        out[f"hc_{d:03d}"] = float(
+            np.pi * (3 * (a + b) - np.sqrt(max((3 * a + b) * (a + 3 * b), 0.0))))
+        # cross-section aspect. A RATIO, so it cancels any residual scale error
+        # -- including whatever the crown anchor still gets wrong.
+        out[f"ha_{d:03d}"] = float(t / w) if w > 1e-6 else 0.0
+    for lo_d, hi_d in SHAPE_RATIOS:
+        a_, b_ = out.get(f"hw_{lo_d:03d}", 0.0), out.get(f"hw_{hi_d:03d}", 0.0)
+        out[f"r_{lo_d:03d}_{hi_d:03d}"] = float(a_ / b_) if b_ > 1e-6 else 0.0
     return out
 
 

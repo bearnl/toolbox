@@ -30,6 +30,7 @@ import argparse
 import numpy as np
 
 from hiride_data import load_manifest, make_split, block_train_counts, eligible_mask
+from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
 
 LADDER = [("R0_frame_random", {}), ("R1_block", dict(guard=150)),
           ("R3_cross_recording", {}), ("R4_cross_session", {})]
@@ -130,16 +131,28 @@ def main():
               f"({100 * (keep & m).sum() / max(m.sum(), 1):5.1f} %)")
 
     bone = [i for i, n in enumerate(names) if n.startswith("bone_")]
-    nuis = [i for i, n in enumerate(names) if n in ("stand_dist_mm", "ground",
-                                                    "n_points", "valid_frac",
-                                                    "top_clip", "bot_clip")]
-    metric = [i for i in range(len(names)) if i not in bone and i not in nuis]
+    # `metric` is PINNED to the 12 published columns. Deriving it as
+    # "everything that is not excluded" would have quietly redefined it the
+    # moment head-anchored features were added to the npz, and every number in
+    # section 8 would have stopped reproducing without anything looking wrong.
+    metric = [i for i, n in enumerate(names) if n in BASE_METRIC]
+    shape = [i for i, n in enumerate(names) if n.startswith(SHAPE_PREFIXES)]
+    missing = set(BASE_METRIC) - {names[i] for i in metric}
+    if missing:
+        print(f"[warn] published metric columns absent from the npz: "
+              f"{sorted(missing)} -- section 8 numbers will NOT reproduce")
     SETS = {"metric": metric}
+    if shape:
+        SETS["shape"] = shape
+        SETS["metric+shape"] = metric + shape
     if bone:
         SETS["skeleton"] = bone
         SETS["both"] = metric + bone
     SETS["metric+nuisance"] = metric + [i for i, n in enumerate(names)
                                         if n == "stand_dist_mm"]
+    if shape:
+        SETS["shape+nuisance"] = shape + [i for i, n in enumerate(names)
+                                          if n == "stand_dist_mm"]
     print("[sets] " + "  ".join(f"{k}={len(v)}" for k, v in SETS.items()))
 
     report = {}
