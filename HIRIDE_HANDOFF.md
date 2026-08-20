@@ -1617,6 +1617,59 @@ of concatenating frame arrays per draw. Byte-identical to the loop it replaces
 **Every interval in the paper must be regenerated with this version.** Earlier
 `stats_final.json` files carry order-dependent intervals.
 
+### 13.8 GAIT IS NOT TESTABLE ON BIWI — measured, not assumed
+
+The R3→R4 decomposition (§13.9) leaves gait as the one untried lever with a
+real chance of raising cross-session depth. `hiride_motion.py` was written to
+check feasibility BEFORE building a temporal model, and it says no.
+
+Motion is ground-plane displacement in millimetres: the person's median depth
+for the radial component, and their mask centroid column unprojected at that
+depth (`(cent_x - 320) * z / 575.816`) for the lateral one. Radial distance
+alone would misread someone walking across the field of view as stationary —
+and `Training`'s 1347 mm span next to a 0.0 mm median radial step is exactly
+that ambiguity, so it had to be resolved before concluding anything. Adding the
+lateral component moved `Training` from 29.2 % to 32.3 % of frame pairs moving
+and changed no verdict.
+
+**Frame rate is 10 fps** (median inter-frame ts delta 100), so a ~1.1 s stride
+cycle is ~11 frames.
+
+| sequence | moving | longest unbroken run (p50) | recordings holding a stride |
+|---|---|---|---|
+| `Training` (R4 trains here) | 32.3 % | 7 frames | **2 / 50** |
+| `Testing/Still` (R3 trains here) | 12.9 % | 3 frames | **0 / 28** |
+| `Testing/Walking` (test side only) | 81.7 % | 15 frames | 21 / 28 |
+
+`Training` subjects shuffle and are repositioned — a third of frame pairs move —
+but never sustain a walk long enough for one stride cycle. **Both training pools
+are therefore gait-free, so no gait feature can be LEARNED at either
+recording-disjoint rung**, whatever `Testing/Walking` contains. The only split
+that could fit gait is train-and-test within `Walking`, which is not
+session-disjoint and answers nothing this paper asks.
+
+Three independent blockers, any one of which would be sufficient:
+
+1. no training pool contains sustained locomotion (2/50, 0/28);
+2. 10 fps gives ~11 samples per stride — marginal for cadence, useless for limb
+   dynamics;
+3. ~203 usable walking frames per subject, and only 21/28 subjects have even one
+   clean stride cycle.
+
+**This retroactively explains the `--frames 10` null.** At R4, `scale_removed/f10`
+scored 13.01 against 12.45 for a single frame, and `sil_scaled/f10` 11.70 against
+14.59 — no gain, and it had no mechanism. It has one now: if the training pool
+holds no locomotion, stacking ten consecutive frames supplies ten near-duplicate
+static views, not motion. The null was a prediction, not a disappointment.
+
+**For the paper.** Write this in Limitations as a measurement, not an omission:
+BIWI cannot test whether gait carries clothing-invariant identity, and here is
+the census showing why. That is a far stronger sentence than silence, and it
+hands paper 3 a concrete corpus specification: **sustained walking in at least
+two sessions per subject, at 25 fps or better.** Do not fit gait inside
+`Walking` to have a number — it would measure the recording, which is the exact
+error this whole re-run exists to correct.
+
 ### 13.6 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
@@ -1640,3 +1693,7 @@ of concatenating frame arrays per draw. Byte-identical to the loop it replaces
 
 3. Figures 1–5 are final in form; only their inputs change.
 4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.
+5. **Gait is closed — negative, see §13.8.** The best remaining lever is
+   §12.8 item 4: metric 3D features (19.04 % at R4) and the CNN (18.01 %) are
+   disjoint representations of the same frames and have never been given to
+   each other. Nothing in §13.8 bears on that.
