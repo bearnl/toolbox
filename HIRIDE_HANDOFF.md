@@ -23,7 +23,9 @@ The 2023 paper (`paper/paper-depth/main.tex`, "HI-RIDE") reports ~0.99 accuracy 
 person identification. An audit established that this measures the evaluation split, not the
 modality (§2). Every experiment has now been re-run on Nibi under leak-free protocols.
 
-### THE EXPERIMENTAL CAMPAIGN IS COMPLETE (2026-08-18)
+### THE EXPERIMENTAL CAMPAIGN IS COMPLETE (2026-08-18; top-ups through 08-20)
+
+**If you are picking this up after 2026-08-19, read §13 before quoting any number involving `interior_only` or the erode sweep** — a filename bug destroyed six runs and scrambled that sweep, and the repair is described there.
 
 459 training cells across seven waves, all `COMPLETED`, 5 seeds each, plus the trivial-cue
 floor, per-rung permutation nulls, subject-cluster bootstrap CIs and two pixel-level
@@ -1236,9 +1238,11 @@ fusion, the dynamic-range finding, anthropometry) is available to use here, with
 camera-Y (`anthro_probe.py:171`); height-above-ground from the shipped ground plane remains
 an open lever.
 
-### 11.2 Figures — the one piece of code still missing
+### 11.2 Figures — DONE, see §13.1
 
-No plotting exists. Four figures carry the argument, and all four are computable from
+`hiride_figures.py` exists and emits six figures. The list below is the original plan, kept because the reasoning about what each figure must carry still holds; §13.1 records what was actually built and the five defects that only became visible once they were rendered.
+
+~~No plotting exists.~~ Four figures carry the argument, and all four are computable from
 artifacts already on disk (`report.md`, `stats_final.json`, the prep shards):
 
 - **Fig. 1 — the ladder.** Accuracy vs rung, depth and RGB, with the trivial-cue floor and
@@ -1436,4 +1440,167 @@ runs files**, verified, so concurrent work is unaffected.
    Re-run with a longer wall for the unbalanced probe-vs-CNN comparison.
 4. **Combine the two wins**: metric features are not yet fed to a network, and
    the `flatten`/`stripe` head has not been tried on top of them.
-5. **Figures** (§11.2) — still the only thing blocking a draft.
+5. ~~**Figures** (§11.2)~~ — done, §13.1.
+
+---
+
+## 13. Session record 2026-08-19/20 — figures, and a filename bug that ate runs
+
+Two things happened: the figure pipeline was built, and building it surfaced a
+data-loss bug that had been running since the `--erode` flag was added. Read
+13.2 before 13.1 if you are short of time — it is the one that changes numbers.
+
+### 13.1 `hiride_figures.py` — six figures, and what rendering them found
+
+Read-only over `stats_final.json` and `range_profile.json`. Nothing is
+recomputed, so a number in a figure and the same number in a table cannot
+disagree; that is the whole design constraint. matplotlib **is** present in
+venv311 (3.11.1, from the Compute Canada wheelhouse), so §11.2's fallback plan
+is moot.
+
+```bash
+python hiride_figures.py --stats $SCRATCH/hiride2/results/stats_final.json \
+    --range $SCRATCH/hiride2/results/range_profile.json \
+    --prep $SCRATCH/hiride2/prep --out $SCRATCH/hiride2/results/figs
+```
+
+| fig | what |
+|---|---|
+| 1 | `rgb − depth` per (arch, condition) cell at each rung — the collapse, as spread |
+| 2 | the ladder, both modalities, subject-cluster CI bands |
+| 3 | mechanism heatmap, conditions × rungs, one panel per modality |
+| 4 | Z-precision axis at R1 and R4 |
+| 5 | range profile: linear-probe accuracy and frame-edge clipping on shared axes |
+| 6 | one frame under every condition, via the trainer's own `apply_mask_condition` |
+
+**Figure 1 is the centrepiece.** One point per (architecture, condition) cell,
+paired by seed on identical test frames, so the visible spread within a rung IS
+the robustness argument: **+19.5 / +39.9 / +32.4 pp, then +1.2 at R4**, across
+both architectures, every head, augmented and not. (Numbers as of the 08-19
+collate; wave 16b will move them slightly.)
+
+**Five defects were found by LOOKING at the rendered output, not by reading the
+code.** All five had passed a clean compile and a synthetic smoke test:
+
+1. **Fig 6 was inverted.** It passed `fill=1.0`; `hiride_train.py` passes `0.0`.
+   The `sil_scaled` panel came out completely blank — silhouette interior and
+   background both land on 1.0 — and every other panel had an inverted
+   background. Calling the trainer's real function was supposed to stop the
+   panel drifting from what the network sees; the wrong argument gave that up.
+   The constant is now `TRAINER_FILL`, with the call site named in a comment.
+2. **Fig 2 substituted architectures.** A `fallback_arch` meant R0 and R3 came
+   from the gap-head baseline while R1 and R4 came from `stripe/aug8/tf10`,
+   under a title naming only the latter — inflating the R1→R3 drop by the head
+   effect (~13 pp at R1). Substitution removed; a rung an arm was not run at is
+   left empty and reported on stdout.
+3. **Fig 2 then interpolated across the gap it had just admitted to**, drawing
+   one straight segment R1→R4 through R3's x-position at a value nothing
+   measured. Only adjacent rungs are connected now.
+4. **Fig 4 stacked two points at 16 bits.** The filter listed `head`,
+   `augment`, `frames`, `encoding` — but not `test_fuse`, so
+   `alexnet/tf10 scale_removed` (48.20 %) was drawn on the plain gap cell
+   (55.40 %). It now matches on the **composed `arch` string**, which cannot
+   omit an axis. The duplicate-detection that found this stays in.
+5. **Fig 1 weighted saturated cells equally.** `bg_plate` at R0 is 99.97 % vs
+   99.91 % — 0.06 pp between two ceilinged cells, carrying the same weight as a
+   61 pp one. It pulled the R0 mean to 13.3 and made the collapse look like it
+   began a rung early. Cells where both modalities clear 95 % are now drawn open
+   and excluded from the mean (R0 mean 13.3 → 19.5).
+
+The lesson worth carrying: **render the figure and look at it.** Every one of
+these survived the checks that do not involve eyes.
+
+### 13.2 `--erode` was missing from the run filename, and it destroyed runs
+
+`results_<tag>.json` is the only thing keeping two training cells apart on disk.
+`tag` did not encode `--erode`. Every `--erode N` run therefore landed on the
+filename of the plain run with the same (policy, modality, arch, condition,
+seed) and **overwrote it**. Slurm reported `COMPLETED` for all of it.
+
+The only visible symptom was the total cell count *falling* from 130 to 127
+after a wave that added 38 runs. Six cells were destroyed:
+`{R1_block,R4_cross_session}_depth_alexnet_interior_only_s{0,1,2}`.
+
+Worse than the loss: array tasks run concurrently, so **the survivor for each
+seed was whichever erode value happened to finish last**. At R1 that left `e4`
+seed 0 next to `e6` seeds 1–2. The erode sweep as collated before 2026-08-20 was
+a random mixture wearing correct-looking labels — which is why `e1` appeared to
+be "never run". **Any statement about erosion made before this date rests on
+`e6` alone, and not even cleanly.**
+
+`--guard` and `--ref-eligibility` were missing from the tag for the same reason.
+Nothing has varied them within one policy yet, so no data was lost there.
+
+Three fixes, all in place:
+
+- **`run_tag(m)`** is one function keyed on the result dict, used both when
+  writing a run and when auditing the runs directory, so writer and auditor
+  cannot disagree about what makes a cell distinct. Default-valued axes stay out
+  of the tag, so every already-correct filename is unchanged.
+- **A pre-write check** compares `CELL_FIELDS` against whatever occupies the
+  target path and raises rather than overwrites. Re-running an *identical* cell
+  stays allowed — that is how a wave tops up seeds without knowing which exist.
+  A future missing axis now fails loudly at the first colliding run.
+- **`hiride_retag.py`** renames each file to the name its own metadata implies.
+  The overwritten runs are gone, but survivors carry correct metadata, so this
+  recovered the erode runs under honest names and freed the plain names for
+  regeneration. Its report doubles as the re-run list. Run it read-only first.
+
+```bash
+python hiride_retag.py --runs $SCRATCH/hiride2/runs           # report
+python hiride_retag.py --runs $SCRATCH/hiride2/runs --apply   # rename
+```
+
+This is the **seventh** instance in this campaign of an axis not reaching a key
+— see §12.8 item 2 for the `n=8` version — and the first that destroyed data
+rather than mislabelling it. The pattern is always the same: a hand-maintained
+list of fields somewhere that has to be updated when a flag is added, and is
+not. Both fixes here replace a hand-maintained list with something derived.
+
+### 13.3 The R1 full-body arm is infeasible, not broken
+
+All 15 tasks of the wave-15 R1 arm (`20144984`) failed with:
+
+> `error: 3 test subjects absent from training (['036', '037', '045']...). A
+> closed-set classifier has no output unit for them; this policy is
+> identity-disjoint and belongs to paper 3.`
+
+At guard 150 the `--eligibility full_body` filter leaves those three subjects
+with **no training frames at all**. The `--ref-eligibility cues` switch added
+for this wave fixed the *reference* construction but not the training set.
+
+This is a dataset fact, not a bug — the guard is doing exactly its job.
+**Report the full-body arm at R4 only** and state the R1 infeasibility in
+Methods. The control exists where it matters: `interior_only stripe full_body`
+at R4 has 5 seeds. Lowering the guard would make the arm non-comparable to
+every other R1 cell; do not do it to fill the table.
+
+### 13.4 Wave 16 — top-ups
+
+38 cells, both policies, all `alexnet` gap-head depth: `scale_removed` and
+`interior_only` at seeds 0–4 (they were sitting at n=2 while printing like any
+other row, and they are the baselines the paired condition contrast subtracts
+against), plus the erode sweep at `e1`/`e4`/`e6` × 3 seeds. Idempotent by
+design — re-running an existing seed rewrites its own file — so it does not need
+to know which seeds are missing. First submission `20145586` predates the
+filename fix and its erode arm was lost to it; `20165081` is the good one.
+
+### 13.5 A packaging near-miss worth knowing about
+
+`pip install matplot` (an unrelated pyloco wrapper, not `matplotlib`) upgraded
+`packaging` from `24.1+computecanada` to PyPI's `26.3` inside venv311 **while 15
+training jobs were live**. TensorFlow 2.15.1 was verified to import and fit
+after the fact, so nothing broke. The venv rule to follow: **`pip install
+--no-deps`** for anything added after the TF install, and if a CC-patched wheel
+does get replaced, `pip install --force-reinstall "packaging==24.1+computecanada"`.
+
+### 13.6 Open items
+
+1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
+   is quoted.** Then `bash collect_all.sh` and re-render figures.
+2. **`sil_scaled +7.89 pp [+0.19, +15.42]` at R4 is the number most likely to
+   move** — its baseline was a 2-seed cell until wave 16, and the interval
+   barely excludes zero. It is currently the only R4 contrast whose
+   subject-level interval clears zero, so the claim in §0 line 4 depends on it.
+3. Figures 1–5 are final in form; only their inputs change.
+4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.
