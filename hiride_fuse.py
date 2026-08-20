@@ -91,6 +91,31 @@ def cnn_cells(runs, policy, modality, arch, condition):
     return sorted(out, key=lambda t: int(t[0]["seed"]))
 
 
+def load_metric(prep, man):
+    """Metric features aligned to manifest rows, plus the eligibility mask.
+
+    Returns (full, have, cols, keep): `full` is (n_manifest_rows, n_features)
+    with NaN where a frame has none, `have` marks the rows that do, `cols`
+    selects the reported `metric` feature set -- skeleton and nuisance columns
+    dropped, exactly as hiride_metric_floor.py does, so this is the same model
+    that scores 19.04 % at R4 -- and `keep` is `have` intersected with cue
+    eligibility.
+    """
+    z = np.load(os.path.join(prep, "cues.npz"), allow_pickle=False)
+    keep_cue = eligible_mask(z["cues"], [str(f) for f in z["feats"]])
+    mf = np.load(os.path.join(prep, "metric_features.npz"), allow_pickle=False)
+    F, names, rows = mf["feats"], [str(n) for n in mf["names"]], mf["manifest_row"]
+    full = np.full((len(man["frame"]), F.shape[1]), np.nan, dtype=np.float32)
+    full[rows] = F
+    have = ~np.isnan(full[:, 0])
+    nuis = {"stand_dist_mm", "ground", "n_points", "valid_frac", "top_clip", "bot_clip"}
+    cols = [i for i, n in enumerate(names) if n not in nuis and not n.startswith("bone_")]
+    print(f"[load] {int(have.sum())} frames with metric features, "
+          f"{int((keep_cue & have).sum())} also cue-eligible; "
+          f"using {len(cols)} metric columns")
+    return full, have, cols, keep_cue & have
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prep", required=True)
@@ -107,21 +132,7 @@ def main():
     conditions = args.condition or ["sil_scaled", "scale_removed", "person_centred"]
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
-    z = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
-    keep_cue = eligible_mask(z["cues"], [str(f) for f in z["feats"]])
-
-    mf = np.load(os.path.join(args.prep, "metric_features.npz"), allow_pickle=False)
-    F, names, rows = mf["feats"], [str(n) for n in mf["names"]], mf["manifest_row"]
-    full = np.full((len(man["frame"]), F.shape[1]), np.nan, dtype=np.float32)
-    full[rows] = F
-    have = ~np.isnan(full[:, 0])
-    keep = keep_cue & have
-    # the reported `metric` feature set: drop skeleton and nuisance columns, as
-    # hiride_metric_floor.py does, so this is the same 19.04 % model
-    nuis = {"stand_dist_mm", "ground", "n_points", "valid_frac", "top_clip", "bot_clip"}
-    cols = [i for i, n in enumerate(names) if n not in nuis and not n.startswith("bone_")]
-    print(f"[load] {int(have.sum())} frames with metric features, {int(keep.sum())} "
-          f"also cue-eligible; using {len(cols)} metric columns")
+    full, have, cols, keep = load_metric(args.prep, man)
 
     from sklearn.ensemble import RandomForestClassifier
     report = {}
