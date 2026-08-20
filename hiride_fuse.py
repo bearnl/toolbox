@@ -47,25 +47,48 @@ import argparse
 import numpy as np
 
 from hiride_data import load_manifest, make_split, eligible_mask
+from hiride_keys import cond_key, arch_key
 from hiride_stats import cluster_boot, boot_rng
 
 
 def cnn_cells(runs, policy, modality, arch, condition):
-    """Every run matching one cell, newest first, as (meta, cm_path)."""
-    out = []
+    """Every run belonging to ONE cell, as (meta, cm_path).
+
+    Keyed through hiride_keys, not through a hand-listed set of fields. The
+    first version of this compared `m["condition"]` directly, which is the RAW
+    condition string -- so scale_removed@1b, scale_removed/f10 and
+    scale_removed/dsil all matched "scale_removed" and were averaged together
+    as if they were seeds of one cell. That produced 15 "seeds" for a 5-seed
+    condition, a row with 2,933 test frames next to rows with 5,642, and CNN
+    accuracies from 3.7 % to 23.6 % inside a single mean.
+
+    hiride_keys exists precisely to stop this; its docstring records the same
+    bug shipping four separate times. Use it rather than re-deriving identity.
+    """
+    out, seen = [], {}
     for f in sorted(glob.glob(os.path.join(runs, "results_*.json"))):
         try:
             m = json.load(open(f))
         except (ValueError, OSError):
             continue
         if (m.get("policy") != policy or m.get("modality") != modality
-                or m.get("arch") != arch or m.get("condition") != condition
-                or m.get("permuted")):
+                or m.get("permuted") or arch_key(m) != arch
+                or cond_key(m) != condition):
             continue
         cm = os.path.join(runs, "cm_" + os.path.basename(f)[len("results_"):-len(".json")] + ".npz")
-        if os.path.exists(cm):
-            out.append((m, cm))
-    return out
+        if not os.path.exists(cm):
+            continue
+        # two runs of one cell sharing a seed means the key is still too loose
+        seed = int(m["seed"])
+        if seed in seen:
+            raise SystemExit(
+                f"error: {condition} seed {seed} matched twice "
+                f"({os.path.basename(seen[seed])} and {os.path.basename(f)}). "
+                f"The cell key is not distinguishing them -- add the differing "
+                f"axis to hiride_keys.AXES.")
+        seen[seed] = f
+        out.append((m, cm))
+    return sorted(out, key=lambda t: int(t[0]["seed"]))
 
 
 def main():
