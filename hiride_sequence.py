@@ -5,10 +5,11 @@
         --condition sil_scaled --out $SCRATCH/hiride2/results
 
 Author's goal, 2026-08-21: bring depth at R4 up to what colour reaches at R3
-(79.5 %). Per FRAME that is not reachable and the campaign can now bound it --
-the oracle over the CNN and the metric features together is 27.6 % (13.10), so
-even a perfect frame-level combination of the two best representations falls
-far short. The information is not in one depth frame.
+(79.5 %). Per FRAME the best measured single-frame result is 19-22 % (13.10),
+a long way short. Note that the `either-correct` rate of 27.6 % reported there
+is NOT a ceiling -- it bounds rules that SELECT between two models, not rules
+that combine their scores, and it says nothing at all about a retrained model
+or about the aggregation done here.
 
 But one frame is not the budget a deployment has. RGB's 79.5 % at R3 is a
 single-frame number only because clothing is a high-entropy cue that needs no
@@ -43,6 +44,31 @@ import numpy as np
 from hiride_data import load_manifest, make_split
 from hiride_stats import cluster_boot, boot_rng
 from hiride_fuse import cnn_cells, load_metric
+
+
+def agg_windows(F, rec, frame, w, stride):
+    """Window-mean feature vectors and the row index each window starts at.
+
+    Averaging the MEASUREMENT beats averaging the posterior when the error is
+    sensor noise: 25 frames cut a stature error by five, and the classifier then
+    sees a sharper feature vector instead of a blurrier vote. Posterior
+    averaging can only reweight decisions already made on noisy inputs.
+
+    Training uses stride 1 (sliding windows) so shortening the window does not
+    also shrink the training set by a factor of w -- at w=25 non-overlapping
+    windows would leave ~14 examples per subject. Test uses stride w, so no test
+    frame is counted twice and the decision count is honest.
+    """
+    blocks = []
+    for r in np.unique(rec):
+        m = np.flatnonzero(rec == r)
+        m = m[np.argsort(frame[m])]
+        if w <= 0 or w >= len(m):
+            blocks.append(m)
+            continue
+        blocks.extend(m[i:i + w] for i in range(0, len(m) - w + 1, stride))
+    X = np.stack([F[b].mean(0) for b in blocks]).astype(np.float32)
+    return X, blocks
 
 
 def windows(order, w):
@@ -94,7 +120,8 @@ def main():
             print(f"\n{cond}: no runs with per-frame posteriors -- skipped")
             continue
         print(f"\n=== {args.policy}  {args.modality}  {args.arch}  {cond} ===")
-        acc = {k: {w: [] for w in W} for k in ("cnn", "metric", "geo")}
+        KEYS = ("cnn", "metric", "geo", "met_agg", "geo_agg")
+        acc = {k: {w: [] for w in W} for k in KEYS}
         ndec = {w: [] for w in W}
         tail = {k: [] for k in ("cnn", "metric", "geo")}
         for meta, cm_path in cells:
@@ -124,12 +151,35 @@ def main():
                                 np.asarray(man["subject"], str)[rows_s],
                                 np.asarray(man["session"], str)[rows_s])])
             frame = np.asarray(man["frame"])[rows_s].astype(np.int64)
+            # training-side recordings, for the window-averaged feature model
+            tr_rec = np.array([f"{a}|{b}|{c}" for a, b, c in
+                               zip(np.asarray(man["seq"], str)[tr],
+                                   np.asarray(man["subject"], str)[tr],
+                                   np.asarray(man["session"], str)[tr])])
+            tr_frame = np.asarray(man["frame"])[tr].astype(np.int64)
             for w in W:
                 for k, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
                     a, n = sequence_acc(P, truth, rec, frame, w)
                     acc[k][w].append(a)
                     if k == "cnn":
                         ndec[w].append(n)
+                # average the MEASUREMENT over the window, then classify
+                Xw, btr = agg_windows(full[tr][:, cols], tr_rec, tr_frame, w, 1)
+                yw = np.array([ytr[b[0]] for b in btr])
+                rfw = RandomForestClassifier(n_estimators=300, random_state=seed,
+                                             n_jobs=-1)
+                rfw.fit(Xw, yw)
+                # ONE set of test blocks, shared by both aggregations, so the
+                # feature-averaged and posterior-averaged columns are decided on
+                # exactly the same frames and are directly comparable
+                Xt, bte = agg_windows(full[rows_s][:, cols], rec, frame, w, max(w, 1))
+                yte = np.array([truth[b[0]] for b in bte])
+                pw = np.zeros((len(bte), p_cnn.shape[1]))
+                pw[:, rfw.classes_.astype(int)] = rfw.predict_proba(Xt)
+                acc["met_agg"][w].append(float((pw.argmax(1) == yte).mean()))
+                pc = np.stack([np.log(p_cnn[b] + 1e-12).mean(0) for b in bte])
+                acc["geo_agg"][w].append(
+                    float(((pc + np.log(pw + 1e-12)).argmax(1) == yte).mean()))
             # per-tracklet correctness, for a subject-clustered interval
             for k, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
                 cor, sub = [], []
@@ -141,13 +191,15 @@ def main():
                 tail[k].append((np.array(cor), np.array(sub)))
 
         hdr = (f"{'frames/decision':>16s}{'decisions':>11s}{'cnn':>9s}"
-               f"{'metric':>9s}{'geo':>9s}")
+               f"{'metric':>9s}{'geo':>9s}{'met_agg':>10s}{'geo_agg':>10s}")
         print(hdr); print("-" * len(hdr))
         for w in W:
             lab = "whole tracklet" if w == 0 else str(w)
             print(f"{lab:>16s}{int(np.mean(ndec[w])):>11d}"
                   + "".join(f"{100 * np.mean(acc[k][w]):>8.2f}%"
-                            for k in ("cnn", "metric", "geo")))
+                            for k in ("cnn", "metric", "geo"))
+                  + "".join(f"{100 * np.mean(acc[k][w]):>9.2f}%"
+                            for k in ("met_agg", "geo_agg")))
         print("  whole-tracklet subject-cluster CI (mean over seeds):")
         cis = {}
         for k in ("cnn", "metric", "geo"):

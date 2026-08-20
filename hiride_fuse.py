@@ -33,12 +33,20 @@ WHAT IT REPORTS, and why in this order:
                    split on which a mixing weight could honestly be chosen; the
                    sweep printed underneath is a diagnostic, and picking its
                    argmax would be fitting the test set.
-  oracle        -- the frame is counted correct if EITHER model is correct. This
-                   is the ceiling any score-level fusion could reach, and it is
-                   the number that actually answers the question: an oracle close
-                   to max(cnn, metric) means redundant, full stop.
-  rescued       -- P(metric correct | CNN wrong). Complementarity, stated as the
-                   quantity a reader will want.
+  either        -- the frame is counted correct if EITHER model's top-1 is
+                   correct. This is NOT a ceiling on fusion, and an earlier
+                   version of this file wrongly said it was. It is exactly the
+                   accuracy of a perfect SELECTOR -- a rule that inspects each
+                   frame and trusts one model or the other -- so it bounds
+                   selection rules and nothing else. A summed posterior can rank
+                   first a class that NEITHER model ranked first (a steady
+                   runner-up in both), so score-level fusion can exceed it, and
+                   a retrained joint model or sequence aggregation is not
+                   related to it at all. Read it as a complementarity
+                   diagnostic: close to max(cnn, metric) means the two fail on
+                   the same frames.
+  rescued       -- P(metric correct | CNN wrong). The direct statement of
+                   complementarity, and the one to quote.
 """
 import os
 import json
@@ -137,7 +145,7 @@ def main():
     from sklearn.ensemble import RandomForestClassifier
     report = {}
     hdr = (f"{'condition':<16s}{'seed':>4s}{'rows':>7s}{'cnn':>8s}{'metric':>8s}"
-           f"{'fused':>8s}{'geo':>8s}{'oracle':>8s}{'rescued':>9s}")
+           f"{'fused':>8s}{'geo':>8s}{'either':>8s}{'rescued':>9s}")
     for cond in conditions:
         cells = cnn_cells(args.runs, args.policy, args.modality, args.arch, cond)
         if not cells:
@@ -185,17 +193,17 @@ def main():
             per_seed.append(dict(seed=seed, n=int(len(y)), cnn=float(c_ok.mean()),
                                  metric=float(m_ok.mean()), fused=float(f_ok.mean()),
                                  geo=float(g_ok.mean()),
-                                 oracle=float((c_ok | m_ok).mean()), rescued=resc))
+                                 either=float((c_ok | m_ok).mean()), rescued=resc))
             paired.append(dict(seed=seed, subj=subj, cnn=c_ok, metric=m_ok,
-                               fused=f_ok, geo=g_ok, oracle=(c_ok | m_ok)))
+                               fused=f_ok, geo=g_ok, either=(c_ok | m_ok)))
 
         if not per_seed:
             continue
         mean = {k: float(np.mean([r[k] for r in per_seed]))
-                for k in ("cnn", "metric", "fused", "geo", "oracle", "rescued")}
+                for k in ("cnn", "metric", "fused", "geo", "either", "rescued")}
         print(f"{'mean':<16s}{len(per_seed):>4d}{'':>7s}"
               + "".join(f"{100*mean[k]:>7.2f}%" for k in ("cnn", "metric", "fused",
-                                                          "geo", "oracle"))
+                                                          "geo", "either"))
               + f"{100*mean['rescued']:>8.2f}%")
         # Paired contrasts, every one on identical frames. The comparison that
         # decides whether fusion is worth reporting is against `metric` -- the
@@ -203,7 +211,7 @@ def main():
         # beat trivially because metric alone already does.
         cis = {}
         for a, b in (("fused", "cnn"), ("fused", "metric"),
-                     ("geo", "cnn"), ("geo", "metric"), ("oracle", "metric")):
+                     ("geo", "cnn"), ("geo", "metric"), ("either", "metric")):
             per = [cluster_boot(P[a].astype(float) - P[b].astype(float), P["subj"],
                                 boot_rng(args.seed, ("fuse", cond, a, b, P["seed"])),
                                 args.boot) for P in paired]
@@ -215,8 +223,9 @@ def main():
             d = 100 * (mean[a] - mean[b])
             flag = "" if lo * hi > 0 else "   (interval straddles zero)"
             print(f"    {k:<16s}{d:>+7.2f} pp   [{100*lo:+.2f}, {100*hi:+.2f}]{flag}")
-        print(f"  headroom: oracle - max(cnn, metric) = "
-              f"{100*(mean['oracle'] - max(mean['cnn'], mean['metric'])):+.2f} pp")
+        print(f"  complementarity: either - max(cnn, metric) = "
+              f"{100*(mean['either'] - max(mean['cnn'], mean['metric'])):+.2f} pp"
+              f"   (a SELECTION bound, not a ceiling on fusion)")
         report[cond] = dict(seeds=per_seed, mean=mean, ci=cis)
 
     if args.out:
@@ -224,9 +233,11 @@ def main():
         with open(path, "w") as fh:
             json.dump(report, fh, indent=1)
         print(f"\n[written] {path}")
-    print("\nREAD: `oracle` is the ceiling of any score-level fusion. If it sits near "
-          "max(cnn, metric),\nthe two representations are reading the same information "
-          "and ~19 % is the frame's content.\nThe equal-weight `fused` column is fixed, "
+    print("\nREAD: `either` is the accuracy of a perfect SELECTOR between the two "
+          "models' top-1 answers.\nIt bounds selection rules ONLY -- a summed posterior "
+          "can promote a class neither model\nranked first, so fusion may exceed it. "
+          "Treat it as a complementarity diagnostic: close\nto max(cnn, metric) means "
+          "the two fail on the same frames. The equal-weight `fused`\ncolumn is fixed, "
           "not tuned -- there is no held-out split to tune it on.")
 
 
