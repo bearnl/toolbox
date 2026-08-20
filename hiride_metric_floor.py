@@ -71,6 +71,15 @@ def main():
                          "clipped body is a SHORTER body, so the height "
                          "features partly encode range. w_15 and w_30, which "
                          "need no vertical extent, do not drift at all.")
+    ap.add_argument("--test-eligibility", choices=("same", "full_body"),
+                    default="same",
+                    help="restrict only the TEST side. Full-body frames are "
+                         "easier frames as well as better-measured ones, so "
+                         "comparing a full_body run against the headline "
+                         "conflates 'the features improved' with 'the test set "
+                         "got easier'. Training on cues and testing on "
+                         "full_body isolates the second; --eligibility "
+                         "full_body then adds the first on top of it.")
     ap.add_argument("--detrend", action="store_true",
                     help="remove one global fixed-effects slope per feature "
                          "against standing distance, fitted on TRAIN rows only "
@@ -93,6 +102,15 @@ def main():
     cue_feats = [str(f) for f in z["feats"]]
     keep_cue = eligible_mask(z["cues"], cue_feats,
                              full_body=(args.eligibility == "full_body"))
+    # The R1 reference counts must come from the STANDARD mask. Under
+    # --eligibility full_body, guard 150 leaves subjects 036/037/045 with no
+    # training frames at all and block_train_counts refuses rather than
+    # silently dropping those classes -- the same infeasibility that killed
+    # wave 15's R1 arm (13.3). match_ntrain only ever subsamples, so taking the
+    # reference from the cues mask is conservative: the full-body arm trains on
+    # at most what its partner does.
+    keep_ref = eligible_mask(z["cues"], cue_feats, full_body=False)
+    keep_test_fb = eligible_mask(z["cues"], cue_feats, full_body=True)
     p_med = z["cues"][:, cue_feats.index("p_med")].astype(np.float64)
 
     mf = np.load(os.path.join(args.prep, "metric_features.npz"), allow_pickle=False)
@@ -130,7 +148,8 @@ def main():
     print("\n" + hdr); print("-" * len(hdr))
     for pol, kw in LADDER:
         if pol.startswith("R1"):
-            kw = dict(kw, match_ntrain=block_train_counts(man, guard=150, seed=0, keep=keep))
+            kw = dict(kw, match_ntrain=block_train_counts(
+                man, guard=150, seed=0, keep=keep_ref & have))
         try:
             tr, va, te = make_split(man, pol, seed=0, keep=keep, **kw)
         except Exception as e:
@@ -141,6 +160,11 @@ def main():
         ytr = np.array([cmap[s] for s in man["subject"][tr]])
         m_te = np.array([s in cmap for s in man["subject"][te]])
         te = te[m_te]
+        if args.test_eligibility == "full_body":
+            before = len(te)
+            te = te[keep_test_fb[te]]
+            print(f"{pol:<20s} test-side full_body keeps {len(te)}/{before} "
+                  f"({100 * len(te) / max(before, 1):.1f} %) test frames")
         if args.range_match:
             lo, hi = np.percentile(p_med[tr], [5, 95])
             inband = (p_med[te] >= lo) & (p_med[te] <= hi)
