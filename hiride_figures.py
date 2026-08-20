@@ -29,6 +29,8 @@ RUNG_LABEL = {"R0_frame_random": "R0\nframe-random",
               "R3_cross_recording": "R3\ncross-recording",
               "R4_cross_session": "R4\ncross-session"}
 DEPTH_C, RGB_C = "#1f77b4", "#d62728"
+# hiride_train.py calls apply_mask_condition(img, m, condition, 0.0, ...)
+TRAINER_FILL = 0.0
 
 
 def save(fig, out, name):
@@ -46,7 +48,7 @@ def cells_by(stats, **match):
 
 
 # --------------------------------------------------------------------------
-def fig_collapse(stats, out):
+def fig_collapse(stats, out, ceiling=95.0):
     """Figure 1 -- the RGB advantage collapses at the cross-session rung.
 
     This is the paper's central claim in one panel. Each point is one
@@ -57,65 +59,103 @@ def fig_collapse(stats, out):
     per = {}
     for r in stats["paired"]:
         key = (r["policy"], r.get("arch", "?"), r["condition"])
-        per.setdefault(key, []).append(r["diff"] * 100)
+        per.setdefault(key, {"d": [], "rgb": [], "depth": []})
+        per[key]["d"].append(r["diff"] * 100)
+        per[key]["rgb"].append(r["rgb"] * 100)
+        per[key]["depth"].append(r["depth"] * 100)
     pts = {}
-    for (policy, arch, cond), ds in per.items():
-        pts.setdefault(policy, []).append((np.mean(ds), f"{arch}/{cond}"))
+    for (policy, arch, cond), v in per.items():
+        # A cell where BOTH modalities sit against the ceiling carries no
+        # information about which modality is better -- bg_plate at R0 is
+        # 99.97 % vs 99.91 %, a 0.06 pp difference that would otherwise pull the
+        # R0 mean toward zero with the same weight as a 61 pp one and make the
+        # collapse look like it starts earlier than it does.
+        sat = min(np.mean(v["rgb"]), np.mean(v["depth"])) >= ceiling
+        pts.setdefault(policy, []).append((np.mean(v["d"]), f"{arch}/{cond}", sat))
 
     have = [p for p in RUNGS if pts.get(p)]
     if not have:
         print("  (fig1 skipped: no paired records)")
         return
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    fig, ax = plt.subplots(figsize=(7.6, 4.8))
     rng = np.random.default_rng(0)
+    n_sat = 0
     for i, policy in enumerate(have):
-        vals = [v for v, _ in pts[policy]]
-        jitter = rng.uniform(-0.13, 0.13, len(vals))
-        ax.scatter(np.full(len(vals), i) + jitter, vals, s=34, alpha=0.75,
-                   color="#444444", zorder=3, edgecolor="none")
-        ax.hlines(np.mean(vals), i - 0.3, i + 0.3, color="#000000", lw=2.2, zorder=4)
-        ax.annotate(f"{np.mean(vals):+.1f}", (i, np.mean(vals)),
-                    textcoords="offset points", xytext=(24, -4), fontsize=9)
+        rows = pts[policy]
+        for marker_sat, face, edge in ((False, "#444444", "none"), (True, "none", "#999999")):
+            vals = [v for v, _, sat in rows if sat == marker_sat]
+            if not vals:
+                continue
+            n_sat += len(vals) if marker_sat else 0
+            ax.scatter(np.full(len(vals), i) + rng.uniform(-0.13, 0.13, len(vals)), vals,
+                       s=36, alpha=0.8, facecolor=face, edgecolor=edge,
+                       linewidth=1.1, zorder=3)
+        live = [v for v, _, sat in rows if not sat]
+        if live:
+            ax.hlines(np.mean(live), i - 0.3, i + 0.3, color="#000000", lw=2.4, zorder=4)
+            ax.annotate(f"{np.mean(live):+.1f}", (i, np.mean(live)),
+                        textcoords="offset points", xytext=(26, -4), fontsize=9.5,
+                        fontweight="bold")
     ax.axhline(0, color="#888888", lw=1, ls="--", zorder=1)
     ax.set_xticks(range(len(have)))
     ax.set_xticklabels([RUNG_LABEL[p] for p in have])
     ax.set_ylabel("RGB accuracy − depth accuracy (pp)")
     ax.set_title("The RGB advantage is protocol-dependent, not modality-intrinsic",
                  fontsize=11)
-    ax.text(0.01, 0.02, "each point = one (architecture, condition) cell, paired by seed\n"
-                        "on identical test frames; bar = mean over cells",
-            transform=ax.transAxes, fontsize=8, color="#555555", va="bottom")
+    cap = ("each point = one (architecture, condition) cell, paired by seed on identical "
+           "test frames; bar = mean")
+    if n_sat:
+        cap += (f"\nopen circles ({n_sat}) = both modalities above {ceiling:.0f} % "
+                f"(saturated; excluded from the mean)")
+    fig.text(0.5, -0.02, cap, ha="center", fontsize=8, color="#555555")
     ax.spines[["top", "right"]].set_visible(False)
     save(fig, out, "fig1_collapse")
 
 
-def fig_ladder(stats, out, condition="scale_removed",
-               arch="alexnet/stripe/aug8/tf10", fallback_arch="alexnet"):
+def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
+               overlay_arch="alexnet/stripe/aug8/tf10"):
     """Figure 2 -- accuracy down the ladder, both modalities, with CIs.
 
-    The reference lines matter as much as the curves: chance is 1/K, but the
-    honest floor is the majority-class rate, and a cell whose CI lower bound sits
-    under it is not an identification result whatever its mean says.
+    NO architecture substitution. The first version of this figure fell back to
+    a different architecture at rungs where the requested one had not been run,
+    so R0 and R3 were the gap-head baseline while R1 and R4 were the best
+    recipe -- under a title naming only the latter. That inflates the R1-to-R3
+    drop by the head effect (about 13 pp at R1) and is exactly the kind of
+    silent substitution the rest of this campaign has been spent removing. A
+    rung the architecture was not run at is left empty and reported.
+
+    The reference line matters as much as the curves: the honest floor is the
+    majority-class rate, not 1/K, and a cell whose CI lower bound sits under it
+    is not an identification result whatever its mean says.
     """
-    fig, ax = plt.subplots(figsize=(7.2, 4.4))
+    fig, ax = plt.subplots(figsize=(7.4, 4.6))
     drawn = False
-    for mod, colour in (("depth", DEPTH_C), ("rgb", RGB_C)):
-        xs, ys, los, his = [], [], [], []
-        for i, policy in enumerate(RUNGS):
-            c = (cells_by(stats, policy=policy, modality=mod, arch=arch,
-                          condition=condition, permuted=False)
-                 or cells_by(stats, policy=policy, modality=mod, arch=fallback_arch,
-                             condition=condition, permuted=False))
-            if not c:
-                continue
-            c = max(c, key=lambda r: r["n_seeds"])
-            xs.append(i); ys.append(c["frame_acc_mean"] * 100)
-            los.append(c["subj_ci_lo_mean"] * 100); his.append(c["subj_ci_hi_mean"] * 100)
-        if not xs:
+    for use_arch, style, alpha, tag in ((arch, "o-", 0.16, arch),
+                                        (overlay_arch, "s--", 0.0, overlay_arch)):
+        if not use_arch:
             continue
-        drawn = True
-        ax.plot(xs, ys, "o-", color=colour, label=mod, lw=2, ms=6, zorder=3)
-        ax.fill_between(xs, los, his, color=colour, alpha=0.16, zorder=2)
+        for mod, colour in (("depth", DEPTH_C), ("rgb", RGB_C)):
+            xs, ys, los, his, missing = [], [], [], [], []
+            for i, policy in enumerate(RUNGS):
+                c = cells_by(stats, policy=policy, modality=mod, arch=use_arch,
+                             condition=condition, permuted=False)
+                if not c:
+                    missing.append(policy.split("_")[0])
+                    continue
+                c = max(c, key=lambda r: r["n_seeds"])
+                xs.append(i); ys.append(c["frame_acc_mean"] * 100)
+                los.append(c["subj_ci_lo_mean"] * 100); his.append(c["subj_ci_hi_mean"] * 100)
+            if not xs:
+                continue
+            drawn = True
+            filled = "none" if style.startswith("s") else colour
+            ax.plot(xs, ys, style, color=colour, label=f"{mod}  {tag}", lw=2, ms=6,
+                    markerfacecolor=filled, zorder=3)
+            if alpha:
+                ax.fill_between(xs, los, his, color=colour, alpha=alpha, zorder=2)
+            if missing:
+                print(f"    fig2: {use_arch} {mod} not run at {', '.join(missing)} "
+                      f"-- left empty, NOT substituted")
     if not drawn:
         print("  (fig2 skipped: no cells for the requested arch/condition)")
         plt.close(fig)
@@ -129,8 +169,9 @@ def fig_ladder(stats, out, condition="scale_removed",
     ax.set_xticklabels([RUNG_LABEL[p] for p in RUNGS])
     ax.set_ylabel("frame accuracy (%)")
     ax.set_ylim(0, 100)
-    ax.set_title(f"{condition}, {arch}  —  band = 95 % subject-cluster bootstrap", fontsize=10)
-    ax.legend(frameon=False, fontsize=9)
+    ax.set_title(f"{condition}  —  band = 95 % subject-cluster bootstrap on the solid arm",
+                 fontsize=10)
+    ax.legend(frameon=False, fontsize=8.5)
     ax.spines[["top", "right"]].set_visible(False)
     save(fig, out, "fig2_ladder")
 
@@ -179,26 +220,53 @@ def fig_bits(stats, out):
                                    ("R4_cross_session", "#7f3fbf", "s")):
         pts = []
         for c in stats["cells"]:
+            # Match on the COMPOSED arch string, not a hand-listed set of
+            # fields. The hand-listed version checked head, augment, frames and
+            # encoding but forgot test_fuse, so alexnet/tf10 scale_removed
+            # (48.20 % at R1) was drawn on top of the plain gap cell (55.40 %)
+            # as a second point at 16 bits. arch_key already composes every
+            # training-side axis, so equality against it cannot miss one.
             if (c["policy"] != policy or c["modality"] != "depth"
-                    or c["permuted"] or c.get("base_condition") != "scale_removed"
-                    or c.get("head", "gap") != "gap" or c.get("augment", 0)
+                    or c["permuted"] or c["arch"] != "alexnet"
+                    or c.get("base_condition") != "scale_removed"
                     or c.get("frames", 1) != 1 or c.get("encoding", "raw") != "raw"
                     or c.get("eligibility", "cues") != "cues"):
                 continue
             pts.append((c.get("bits", 16), c["frame_acc_mean"] * 100,
-                        c["subj_ci_lo_mean"] * 100, c["subj_ci_hi_mean"] * 100))
+                        c["subj_ci_lo_mean"] * 100, c["subj_ci_hi_mean"] * 100,
+                        c["n_seeds"]))
         if not pts:
             continue
+        # Two cells landing on the same bit value means the filter above is not
+        # unique -- the first version drew a vertical jump at 16 bits from two
+        # stacked points and gave no clue which cells they were.
+        by_bits = {}
+        for row in pts:
+            by_bits.setdefault(row[0], []).append(row)
+        for bits, rows in sorted(by_bits.items()):
+            if len(rows) > 1:
+                names = [f"{c['arch']}/{c['condition']} n={c['n_seeds']}"
+                         for c in stats["cells"]
+                         if c["policy"] == policy and c["modality"] == "depth"
+                         and c.get("bits", 16) == bits and c["arch"] == "alexnet"
+                         and c.get("base_condition") == "scale_removed"
+                         and c.get("frames", 1) == 1
+                         and c.get("encoding", "raw") == "raw"
+                         and c.get("eligibility", "cues") == "cues"
+                         and not c["permuted"]]
+                print(f"    fig4: {policy} has {len(rows)} cells at {bits} bits "
+                      f"-- {names}; plotting the one with most seeds")
+        pts = [max(rows, key=lambda r: r[4]) for _, rows in sorted(by_bits.items())]
         drawn = True
-        pts.sort()
-        b, y, lo, hi = map(np.array, zip(*pts))
+        b, y, lo, hi, _ = map(np.array, zip(*pts))
         ax.plot(b, y, marker + "-", color=colour, label=policy.split("_")[0], lw=2)
         ax.fill_between(b, lo, hi, color=colour, alpha=0.15)
     if not drawn:
         print("  (fig4 skipped: no bit-depth cells)")
         plt.close(fig)
         return
-    ax.set_xscale("log", base=2)
+    ax.set_xticks([1, 2, 3, 4, 8, 16])
+    ax.set_xticklabels(["1", "2", "3", "4", "8", "16"])
     ax.set_xlabel("depth quantisation (bits, fixed global scale)")
     ax.set_ylabel("frame accuracy (%)")
     ax.set_title("Z-precision axis  —  band = 95 % subject-cluster bootstrap", fontsize=10)
@@ -221,15 +289,24 @@ def fig_range(rp, out):
     edges = rp["bins"]
     centres = [(edges[k] + min(edges[k + 1], 4500)) / 2 for k in range(len(edges) - 1)]
     labels = [f"{int(edges[k])}–{int(edges[k+1])}" for k in range(len(edges) - 1)]
-    fig, ax = plt.subplots(figsize=(7.4, 4.4))
+    fig, ax = plt.subplots(figsize=(8.2, 4.6))
+    # Every depth arm was drawn in the same blue, so five curves were
+    # indistinguishable. Vary marker and dash instead of hue, keeping the
+    # depth/RGB colour split that carries the actual contrast.
+    styles = [("o", "-"), ("s", "--"), ("^", "-."), ("D", ":"), ("v", (0, (3, 1, 1, 1)))]
+    di = 0
     for label, accs in sorted(rp["probe_acc"].items()):
         if "normals" in label or " f" in label:
             continue                      # keep the panel to the reported arms
-        colour = RGB_C if label.startswith("rgb") else DEPTH_C
+        is_rgb = label.startswith("rgb")
+        colour = RGB_C if is_rgb else DEPTH_C
+        marker, dash = styles[di % len(styles)]
+        di += 0 if is_rgb else 1
         ys = [None if a is None else a * 100 for a in accs]
         xs = [c for c, y in zip(centres, ys) if y is not None]
         yy = [y for y in ys if y is not None]
-        ax.plot(xs, yy, "o-", color=colour, alpha=0.85, lw=1.8, label=label)
+        ax.plot(xs, yy, marker=marker, ls=dash, color=colour, alpha=0.9, lw=1.8,
+                ms=5, label=label)
     ax.set_xlabel("person median depth (mm)")
     ax.set_ylabel("linear-probe accuracy (%)")
     ax.set_xticks(centres)
@@ -247,7 +324,8 @@ def fig_range(rp, out):
     ax2.set_ylabel("frames with body clipped (%)", color="#666666")
     ax2.set_ylim(0, 105)
     h1, l1 = ax.get_legend_handles_labels(); h2, l2 = ax2.get_legend_handles_labels()
-    ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=7.5, loc="upper left")
+    ax.legend(h1 + h2, l1 + l2, frameon=False, fontsize=7.5,
+              loc="center left", bbox_to_anchor=(1.10, 0.5))
     ax.set_title("Distance and body-clipping are confounded in BIWI", fontsize=10)
     save(fig, out, "fig5_range")
 
@@ -292,7 +370,13 @@ def fig_conditions(prep, out, subject=None, n_show=7):
     fig, axes = plt.subplots(1, len(conds), figsize=(2.0 * len(conds), 2.5))
     for ax, cond in zip(np.atleast_1d(axes), conds):
         try:
-            v = apply_mask_condition(img, mask, cond, fill=1.0)
+            # fill MUST match the trainer's call site (hiride_train.py passes
+            # 0.0). With fill=1.0 the sil_scaled panel renders completely blank
+            # -- silhouette interior and background both land on 1.0 -- and
+            # every other panel gets an inverted background. Calling the real
+            # function with the wrong argument is no better than reimplementing
+            # it.
+            v = apply_mask_condition(img, mask, cond, TRAINER_FILL)
         except Exception as exc:                       # bg_plate needs the plates
             ax.text(0.5, 0.5, f"{cond}\n(n/a)", ha="center", va="center", fontsize=8)
             ax.set_axis_off()
