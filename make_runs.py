@@ -314,10 +314,36 @@ WAVE15 = dict(
 )
 
 
+# Wave 16 -- TOP-UPS. The short-cell warning added to hiride_collate.py named
+# cells that had been quietly averaging over 1 or 2 seeds while the table read
+# like every other row. Two kinds:
+#
+#   gap-head scale_removed / interior_only at n=2. These are the baselines the
+#   paired condition contrast in hiride_stats.py subtracts against, so a 2-seed
+#   mean propagates into every `cond - full` row at that policy.
+#
+#   the wave-12 erode sweep: e1 never appeared at all, e4 landed 1 of 3, e6 2 of
+#   3. Before the cell key was extracted these eleven runs all merged into one
+#   `interior_only` cell, which is why nobody noticed.
+#
+# Re-running a seed that already exists just rewrites its own file, so this is
+# idempotent -- no need to work out which seeds are missing. 38 cells.
+WAVE16 = dict(
+    policies=[("R1_block", "--guard 150"), ("R4_cross_session", "")],
+    cells=[
+        ("scale_removed", "depth", "", [0, 1, 2, 3, 4]),
+        ("interior_only", "depth", "", [0, 1, 2, 3, 4]),
+        ("interior_only", "depth", "--erode 1", [0, 1, 2]),
+        ("interior_only", "depth", "--erode 4", [0, 1, 2]),
+        ("interior_only", "depth", "--erode 6", [0, 1, 2]),
+    ],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -401,6 +427,12 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 16:
+        for policy, extra in WAVE16["policies"]:
+            for cond, mod, flags, seeds in WAVE16["cells"]:
+                for seed in seeds:
+                    lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
+                                 f"--condition {cond} --seed {seed} {flags} {extra}".strip())
     elif args.wave == 11:
         for policy, extra in WAVE11["policies"]:
             for cond, mod in WAVE11["cells"]:
