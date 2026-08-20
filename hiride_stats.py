@@ -163,7 +163,8 @@ def main():
         p = mcnemar_exact(b, c)
         diff = r_ok.astype(float) - d_ok.astype(float)
         lo, hi = cluster_boot(diff, R["subj"], rng, args.boot)
-        rec = dict(policy=policy, guard=guard, condition=cond, seed=seed, rgb=float(r_ok.mean()),
+        rec = dict(policy=policy, guard=guard, arch=arch, condition=cond, seed=seed,
+                   rgb=float(r_ok.mean()),
                    depth=float(d_ok.mean()), diff=float(diff.mean()), ci=[lo, hi],
                    discordant_rgb_only=b, discordant_depth_only=c, mcnemar_p=p,
                    n_test=int(len(diff)))

@@ -139,7 +139,10 @@ def main():
 
     if args.out:
         os.makedirs(args.out, exist_ok=True)
-        rec = {"policy": args.policy, "bins": edges.tolist(), "splits": {}}
+        # carry the probe accuracies into the same file, so the range figure has
+        # one source instead of joining two JSONs by a label string.
+        rec = {"policy": args.policy, "bins": edges.tolist(), "splits": {},
+               "probe_acc": probe if args.signal else {}}
         for name, idx in (("test", te), ("train", tr)):
             b = bin_index(p_med[idx], edges)
             rec["splits"][name] = [
