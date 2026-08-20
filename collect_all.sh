@@ -15,9 +15,19 @@ BAD=$(sacct -u "$USER" -S now-24hours -X -n -P --format=JobID,State,JobName \
       | grep -Ev "COMPLETED|RUNNING|PENDING" | head -20)
 if [ -z "$BAD" ]; then echo "  none"; else
   echo "$BAD"
-  for j in $(echo "$BAD" | cut -d'|' -f1 | cut -d'_' -f1 | sort -u); do
-    f=$(ls -t logs/*_"$j"*.out 2>/dev/null | head -1)
-    [ -n "$f" ] && { echo "  --- $f ---"; grep -E "Error|Traceback|error:|Killed|OOM" "$f" | tail -5; }
+  # Match the FAILED task exactly. Globbing on the array's parent id picked
+  # whichever log was newest -- often a task that succeeded -- so the failure
+  # printed no error at all.
+  for jid in $(echo "$BAD" | cut -d'|' -f1 | head -6); do
+    f=$(ls -t logs/*"$jid".out 2>/dev/null | head -1)
+    [ -z "$f" ] && f=$(ls -t logs/*"${jid/_/_*}"*.out 2>/dev/null | head -1)
+    if [ -n "$f" ]; then
+      echo "  --- $jid -> $f ---"
+      grep -E "Error|Traceback|error:|Killed|OOM|SystemExit|Exception" "$f" | tail -6
+      tail -3 "$f"
+    else
+      echo "  --- $jid: no log found ---"
+    fi
   done
 fi
 

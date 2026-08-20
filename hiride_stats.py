@@ -140,7 +140,7 @@ def main():
 
     # ---- 2. paired RGB vs depth on identical test rows -----------------------
     print("\nPaired modality contrast (same policy, seed, condition; identical test frames):\n")
-    hdr = (f"{'policy':<20s}{'condition':<16s}{'seed':>4s} {'rgb':>7s} {'depth':>7s} "
+    hdr = (f"{'policy':<20s}{'arch/condition':<44s}{'seed':>4s} {'rgb':>7s} {'depth':>7s} "
            f"{'rgb-depth':>10s} {'subj-boot 95% CI':>18s} {'discordant b/c':>15s} {'McNemar p':>10s}")
     print(hdr)
     print("-" * len(hdr))
@@ -168,17 +168,20 @@ def main():
                    discordant_rgb_only=b, discordant_depth_only=c, mcnemar_p=p,
                    n_test=int(len(diff)))
         out["paired"].append(rec)
-        pol_diffs.setdefault((policy, guard, cond), []).append(rec["diff"])
+        # arch MUST be in this key. Without it the summary pools gap, stripe and
+        # stripe/aug8/tf10 into one "scale_removed" row -- three different models,
+        # one printed mean, and an odd seed count (18) as the only hint.
+        pol_diffs.setdefault((policy, guard, arch, cond), []).append(rec["diff"])
         name = policy + (f"g{guard}" if guard is not None else "")
-        print(f"{name:<20s}{cond:<16s}{seed:>4d} {100 * rec['rgb']:6.2f}% {100 * rec['depth']:6.2f}% "
+        print(f"{name:<20s}{(arch + '/' + cond):<44s}{seed:>4d} {100 * rec['rgb']:6.2f}% {100 * rec['depth']:6.2f}% "
               f"{100 * rec['diff']:+9.2f}  [{100 * lo:+6.2f}, {100 * hi:+6.2f}] "
               f"{b:>7d}/{c:<7d} {p:10.2e}")
     if pol_diffs:
         print()
-        for (policy, guard, cond), ds in sorted(pol_diffs.items()):
+        for (policy, guard, arch, cond), ds in sorted(pol_diffs.items()):
             ds = np.array(ds) * 100
-            name = (policy + (f"g{guard}" if guard is not None else "")) + f" [{cond}]"
-            print(f"  {name:<38s} rgb-depth over {len(ds)} seeds: {ds.mean():+6.2f} pp "
+            name = (policy + (f"g{guard}" if guard is not None else "")) + f" [{arch}/{cond}]"
+            print(f"  {name:<62s} rgb-depth over {len(ds)} seeds: {ds.mean():+6.2f} pp "
                   f"(sd {ds.std():4.2f}, se {ds.std(ddof=1) / np.sqrt(len(ds)) if len(ds) > 1 else float('nan'):4.2f})")
 
     # ---- 3. paired mask-condition vs full, same modality/seed, identical rows --
