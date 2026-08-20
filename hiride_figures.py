@@ -149,10 +149,30 @@ def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
                 continue
             drawn = True
             filled = "none" if style.startswith("s") else colour
-            ax.plot(xs, ys, style, color=colour, label=f"{mod}  {tag}", lw=2, ms=6,
-                    markerfacecolor=filled, zorder=3)
+            marker, dash = style[0], style[1:]
+            # Only connect rungs that are ADJACENT. The overlay arm exists at R1
+            # and R4 but not R3, and a single line between them runs through
+            # R3's x-position at a value nothing measured -- a drawn claim about
+            # the rung the arm was never trained on. Gaps break the line; the
+            # markers still show where the arm does exist.
+            runs, cur = [], [0]
+            for k in range(1, len(xs)):
+                if xs[k] == xs[k - 1] + 1:
+                    cur.append(k)
+                else:
+                    runs.append(cur); cur = [k]
+            runs.append(cur)
+            ax.plot(xs, ys, marker, color=colour, ms=6, markerfacecolor=filled,
+                    ls="none", label=f"{mod}  {tag}", zorder=3)
+            for run in runs:
+                if len(run) > 1:
+                    ax.plot([xs[k] for k in run], [ys[k] for k in run], ls=dash,
+                            color=colour, lw=2, zorder=3)
             if alpha:
-                ax.fill_between(xs, los, his, color=colour, alpha=alpha, zorder=2)
+                for run in runs:
+                    ax.fill_between([xs[k] for k in run], [los[k] for k in run],
+                                    [his[k] for k in run], color=colour,
+                                    alpha=alpha, zorder=2)
             if missing:
                 print(f"    fig2: {use_arch} {mod} not run at {', '.join(missing)} "
                       f"-- left empty, NOT substituted")
