@@ -1621,22 +1621,22 @@ of concatenating frame arrays per draw. Byte-identical to the loop it replaces
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
    is quoted.** Then `bash collect_all.sh` and re-render figures.
-2. **`sil_scaled` vs `full` at R4 is a knife-edge claim — treat it as
-   marginal, not significant.** Wave 16 left the contrast itself unchanged at
-   **+7.89 pp**, but the interval moved from `[+0.19, +15.42]` to
-   `[+0.10, +15.65]` on identical data, which is what exposed the ordering bug
-   in §13.7. With that fixed and `--boot 20000`, the Monte-Carlo spread of the
-   2.5 % bound is about **0.03 pp** — against a bound sitting at roughly
-   **+0.1 pp**. So the interval does exclude zero, but by an amount comparable
-   to bootstrap noise, and it is the ONLY R4 contrast that clears zero at all.
+2. **`sil_scaled` vs `full` at R4: reproducibly positive, but quote the
+   interval.** `+7.89 pp`, and the 95 % subject-cluster lower bound across five
+   independent bootstrap seeds (0–4, `--boot 20000`) is
+   **+0.21, +0.21, +0.15, +0.12, +0.18** — positive every time, spread 0.09 pp.
+   It is the only R4 contrast whose interval clears zero, and that statement is
+   now stable rather than an artefact of processing order (§13.7 — the earlier
+   `+0.10` that suggested otherwise came from the buggy shared RNG).
 
-   **Do not write "significantly better than the full metric-depth frame."**
-   What the data supports: the normalised binary silhouette is the best R4
-   condition measured, and its advantage over the full frame is positive with a
-   lower bound indistinguishable from zero. §0 line 4 currently overstates this
-   and must be rewritten before submission. The honest version of the paper's
-   claim does not need it: the collapse itself, and the fact that what survives
-   is framing-normalised outline rather than metric depth, both stand on the
-   condition ordering without needing this one interval to clear zero.
+   So it may be reported as significant. What it must not be is *oversold*: the
+   lower bound is ~0.2 pp on a 7.89 pp effect, which is "barely clears zero at
+   n = 28 subjects", not a robust margin. Always print the interval next to the
+   point estimate, state `--boot` and `--seed` in Methods, and do not let the
+   paper's central argument rest on this one row. It does not need to: the
+   collapse (+39.9 → +1.2 pp, Fig. 1) and the finding that what survives is
+   framing-normalised outline rather than metric depth both follow from the
+   ORDERING of conditions across many cells, which no single interval controls.
+
 3. Figures 1–5 are final in form; only their inputs change.
 4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.
