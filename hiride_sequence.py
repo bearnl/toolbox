@@ -41,7 +41,7 @@ import json
 import argparse
 import numpy as np
 
-from hiride_data import load_manifest, make_split
+from hiride_data import load_manifest, make_split, eligible_mask
 from hiride_stats import cluster_boot, boot_rng
 from hiride_fuse import cnn_cells, load_metric
 
@@ -104,6 +104,16 @@ def main():
                     help="frames per decision; 0 = the whole tracklet")
     ap.add_argument("--boot", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--full-body", action="store_true",
+                    help="score only frames whose whole body is in shot. "
+                         "hiride_metric_floor.py puts unclipped frames at "
+                         "28.06 %% against 9.3 %% for clipped ones at R4, "
+                         "because a clipped body yields a wrong stature -- so "
+                         "this is a validity gate, not a difficulty filter. "
+                         "Rejecting frames a sensor cannot measure is a real "
+                         "deployment choice; the retained fraction is printed "
+                         "and the resulting accuracy is NOT comparable to the "
+                         "unrestricted headline.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     conds = args.condition or ["sil_scaled", "scale_removed"]
@@ -111,6 +121,12 @@ def main():
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
     full, have, cols, keep = load_metric(args.prep, man)
+    gate = None
+    if args.full_body:
+        zc = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
+        gate = eligible_mask(zc["cues"], [str(f) for f in zc["feats"]],
+                             full_body=True)
+        print(f"[gate] full-body frames: {int(gate.sum())} of {len(gate)}")
     from sklearn.ensemble import RandomForestClassifier
 
     report = {}
@@ -129,13 +145,20 @@ def main():
             d = np.load(cm_path, allow_pickle=False)
             te_rows, classes = d["test_rows"], [str(c) for c in d["classes"]]
             sel = have[te_rows]
+            if gate is not None:
+                sel = sel & gate[te_rows]
             rows_s = te_rows[sel]
+            if len(rows_s) < 50:
+                print(f"  seed {seed}: only {len(rows_s)} test frames survive "
+                      f"the gate -- skipped")
+                continue
             p_cnn = d["prob"].astype(np.float64)[sel]
             p_cnn /= np.clip(p_cnn.sum(1, keepdims=True), 1e-12, None)
             truth = d["truth"].astype(int)[sel]
 
             cmap = {c: i for i, c in enumerate(classes)}
-            tr, _, _ = make_split(man, args.policy, seed=seed, keep=keep)
+            tr, _, _ = make_split(man, args.policy, seed=seed,
+                                  keep=(keep & gate) if gate is not None else keep)
             tr = tr[np.array([str(s) in cmap for s in man["subject"][tr]], bool)]
             ytr = np.array([cmap[str(s)] for s in man["subject"][tr]])
             rf = RandomForestClassifier(n_estimators=300, random_state=seed, n_jobs=-1)
