@@ -175,7 +175,8 @@ def main():
                                  metric=float(m_ok.mean()), fused=float(f_ok.mean()),
                                  geo=float(g_ok.mean()),
                                  oracle=float((c_ok | m_ok).mean()), rescued=resc))
-            paired.append((f_ok.astype(float) - c_ok.astype(float), subj, seed))
+            paired.append(dict(seed=seed, subj=subj, cnn=c_ok, metric=m_ok,
+                               fused=f_ok, geo=g_ok, oracle=(c_ok | m_ok)))
 
         if not per_seed:
             continue
@@ -185,15 +186,27 @@ def main():
               + "".join(f"{100*mean[k]:>7.2f}%" for k in ("cnn", "metric", "fused",
                                                           "geo", "oracle"))
               + f"{100*mean['rescued']:>8.2f}%")
-        cis = [cluster_boot(d, s, boot_rng(args.seed, ("fuse", cond, sd)), args.boot)
-               for d, s, sd in paired]
-        lo, hi = float(np.mean([c[0] for c in cis])), float(np.mean([c[1] for c in cis]))
-        gain = 100 * (mean["fused"] - mean["cnn"])
-        print(f"  fused - cnn: {gain:+.2f} pp   subject-cluster CI "
-              f"[{100*lo:+.2f}, {100*hi:+.2f}]  (mean over {len(cis)} seeds)")
+        # Paired contrasts, every one on identical frames. The comparison that
+        # decides whether fusion is worth reporting is against `metric` -- the
+        # best SINGLE representation -- not against the CNN, which both fusions
+        # beat trivially because metric alone already does.
+        cis = {}
+        for a, b in (("fused", "cnn"), ("fused", "metric"),
+                     ("geo", "cnn"), ("geo", "metric"), ("oracle", "metric")):
+            per = [cluster_boot(P[a].astype(float) - P[b].astype(float), P["subj"],
+                                boot_rng(args.seed, ("fuse", cond, a, b, P["seed"])),
+                                args.boot) for P in paired]
+            cis[f"{a}-{b}"] = [float(np.mean([c[0] for c in per])),
+                               float(np.mean([c[1] for c in per]))]
+        print(f"  paired contrasts (subject-cluster CI, mean over {len(paired)} seeds):")
+        for k, (lo, hi) in cis.items():
+            a, b = k.split("-")
+            d = 100 * (mean[a] - mean[b])
+            flag = "" if lo * hi > 0 else "   (interval straddles zero)"
+            print(f"    {k:<16s}{d:>+7.2f} pp   [{100*lo:+.2f}, {100*hi:+.2f}]{flag}")
         print(f"  headroom: oracle - max(cnn, metric) = "
               f"{100*(mean['oracle'] - max(mean['cnn'], mean['metric'])):+.2f} pp")
-        report[cond] = dict(seeds=per_seed, mean=mean, ci=[lo, hi])
+        report[cond] = dict(seeds=per_seed, mean=mean, ci=cis)
 
     if args.out:
         path = os.path.join(args.out, "fusion.json")
