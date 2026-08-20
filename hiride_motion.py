@@ -1,6 +1,12 @@
 #!/usr/bin/env python3
 """Does each corpus actually contain LOCOMOTION? A feasibility gate for gait.
 
+Motion is measured as GROUND-PLANE displacement in millimetres -- the person's
+median depth for the radial component, and their mask centroid column
+unprojected at that depth for the lateral one. Radial distance alone is blind to
+someone walking across the field of view at constant range, which would read as
+a perfectly stationary subject.
+
     python hiride_motion.py --prep $SCRATCH/hiride2/prep
 
 Gait is the one untested lever with a real chance of raising cross-session depth
@@ -32,6 +38,8 @@ from hiride_data import load_manifest
 MOVE_MM = 20.0
 # Frames a contiguous moving run must hold to contain a stride cycle.
 MIN_RUN = 13
+# Kinect v1 colour/depth intrinsics, as used by hiride_metric.py.
+FX, CX = 575.816, 320.0
 
 
 def main():
@@ -50,6 +58,9 @@ def main():
         raise SystemExit(f"no p_med in cues.npz; have {feats}")
 
     p_med = cues[:, col["p_med"]].astype(np.float64)
+    if "cent_x" not in col:
+        raise SystemExit(f"no cent_x in cues.npz; have {feats}")
+    cent_x = cues[:, col["cent_x"]].astype(np.float64)
     seq = np.asarray(man["seq"], dtype=str)
     subj = np.asarray(man["subject"], dtype=str)
     sess = np.asarray(man["session"], dtype=str)
@@ -71,7 +82,13 @@ def main():
             continue
         order = np.argsort(frame[m])
         z_mm = p_med[m][order]
-        d = np.abs(np.diff(z_mm))
+        # PLANAR displacement, not radial. p_med alone is blind to a subject
+        # walking ACROSS the field of view at constant distance -- that reads as
+        # a 0.0 mm step while the person is plainly walking. cent_x is a pixel
+        # column, so unproject it at the person's own depth before differencing:
+        # x_mm = (cent_x - cx) * z / fx. Ground-plane motion is then hypot(dx, dz).
+        x_mm = (cent_x[m][order] - CX) * z_mm / FX
+        d = np.hypot(np.diff(x_mm), np.diff(z_mm))
         # SPAN ALONE DOES NOT MEAN WALKING. A subject who stands at 2 m, is
         # repositioned, and stands at 3.3 m accumulates 1300 mm of span without
         # ever taking a stride -- which is exactly what Training's 1347 mm span
