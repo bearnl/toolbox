@@ -2160,6 +2160,65 @@ feature set, they are another paper's result. What paper 2 can say is that a
 CNN on raw depth does not recover geometry that tracked joints make explicit —
 citing paper 1 for the joints, claiming nothing from them.
 
+### 13.17 The CNN does NOT fail for want of metric scale — pre-registered, refuted
+
+Wave 17 handed the network the one quantity it cannot compute: the subject's
+standing distance, appended to the pooled image features (`--aux dist`,
+z-scored on train rows, frame set unchanged so each cell pairs exactly against
+its `--aux none` partner). The prediction was fixed in `make_runs.py` before
+the run and restated in `hiride_aux.py`, so the verdict could not be
+reverse-engineered.
+
+| policy | condition | size | none | +dist | delta | subject-cluster CI |
+|---|---|---|---|---|---|---|
+| R3 | `person` | kept | 8.61 | 8.86 | +0.25 | [−1.98, +2.42] |
+| R3 | `person_centred` | kept | 9.41 | 9.89 | +0.48 | [−1.39, +2.43] |
+| R3 | `scale_removed` | removed | 14.89 | 14.05 | −0.84 | [−4.64, +3.04] |
+| R3 | `sil_scaled` | removed | 14.05 | 13.74 | −0.31 | [−3.23, +2.51] |
+| R4 | `person` | kept | 10.66 | 7.67 | −2.98 | [−9.48, +3.08] |
+| R4 | `person_centred` | kept | 11.17 | 11.10 | −0.07 | [−9.57, +9.57] |
+| R4 | `scale_removed` | removed | 13.54 | 10.03 | −3.51 | [−11.22, +4.26] |
+| R4 | `sil_scaled` | removed | 13.15 | 16.02 | +2.88 | [−3.54, +9.30] |
+
+Mean delta: size-kept **−0.58 pp**, size-removed **−0.45 pp**. The two groups
+were predicted to SEPARATE and do not. Every interval straddles zero.
+
+**Where the test has power, the hypothesis is excluded, not merely unproven.**
+At R4 the intervals are ±9 pp on 3 seeds, so only a very large effect would
+have shown — read R4 as uninformative. At R3 they are ±2.4 pp, so distance
+buys **at most +2.4 pp** on the size-preserving conditions. The gap this was
+meant to explain is the CNN's 18.40 % against the metric features' 28.86 % at
+R4. A ceiling of 2.4 pp does not close 10 pp.
+
+**So the "convnets discard metric scale" story is wrong as a SUFFICIENT
+explanation.** The network cannot compute millimetres, that much is true — but
+handing it the missing term changes nothing, so not computing them was not
+what was holding it back.
+
+**What survives as the explanation of the CNN's weakness**, all measured:
+
+1. **It reads outline, not 3D shape.** Quantising depth to 4 bits — 375 mm per
+   level, the whole body inside one level — costs nothing at R4 (13.02 vs
+   12.45 at 16 bits, §8.4), and its best R4 input is `sil_scaled`, a binary
+   silhouette. Interior relief is not being used, and at 2–4 m the sensor
+   cannot resolve it anyway (26 mm quantisation step at 3 m against ~15 mm of
+   facial relief).
+2. **Its errors are systematic, not noisy.** Aggregating a tracklet lifts the
+   metric model 28.86 -> 50.71 % and the CNN only 18.40 -> 20.71 % (§13.12).
+   It makes the same wrong call frame after frame — recording memorisation,
+   which no extra input fixes.
+3. **Sample size.** ~7,894 training frames for 28 classes at R4, but
+   consecutive frames are near-duplicates, so independent samples per class
+   number in the tens against ~23M parameters. ImageNet ConvNeXt does not
+   rescue it (8.45 % at R4), so this is a data limit and not an AlexNet one.
+
+**For the journal this is a better result than a confirmation would have been.**
+It is a pre-registered test with a stated falsifier, run and refuted, and it
+closes a question a reviewer would otherwise raise: *did you try giving the
+network the calibration it lacks?* Yes, and it did not help. Report it in the
+negative-results section with the R3 power bound, which is what makes it an
+exclusion rather than a shrug.
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
@@ -2182,6 +2241,9 @@ citing paper 1 for the joints, claiming nothing from them.
    ORDERING of conditions across many cells, which no single interval controls.
 
 3. Figures 1–5 are final in form; only their inputs change.
+3b. **Wave 17 is closed (§13.17).** No further architecture work is warranted
+   at n = 28: the two candidate representational fixes are now both tested
+   (score fusion §13.10, metric scale §13.17) and neither moved the number.
 4. §12.8 items 1, 3 and 4 are untouched by this session and still stand.
 5. **Gait is closed — negative, §13.8.**
 6. **Score-level metric+CNN fusion is closed — complementarity confirmed, the
