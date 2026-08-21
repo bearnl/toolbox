@@ -21,6 +21,8 @@ import time
 import argparse
 
 import numpy as np
+
+from hiride_keys import AXES
 import tensorflow as tf
 from sklearn.metrics import f1_score, confusion_matrix
 
@@ -229,6 +231,12 @@ CELL_FIELDS = ("policy", "modality", "arch", "init", "condition", "seed", "guard
                "permuted", "bits", "depth_slab_mm", "frames", "encoding", "erode",
                "head", "eligibility", "ref_eligibility", "augment", "test_fuse",
                "aux")
+
+
+def _axis(rec, field):
+    """One cell-identity field, with an absent value resolved to its default."""
+    v = rec.get(field)
+    return AXES[field] if v is None and field in AXES else v
 
 
 def run_tag(m):
@@ -1048,8 +1056,14 @@ def main():
             prev = json.load(open(path))
         except (ValueError, OSError):
             prev = {}
-        clash = {k: (prev.get(k), res.get(k)) for k in CELL_FIELDS
-                 if prev.get(k) != res.get(k)}
+        # A field ABSENT from the file on disk is not a difference -- it is an
+        # older trainer that did not record that axis yet. Wave 17 lost 48
+        # trained jobs to this: every run finished its 60 epochs and was then
+        # refused at the write, because files from waves 2-9 have no `bits`,
+        # `head` or `augment` key and None != 16 compares unequal. AXES already
+        # states what each axis's default means, so resolve through it.
+        clash = {k: (_axis(prev, k), _axis(res, k)) for k in CELL_FIELDS
+                 if _axis(prev, k) != _axis(res, k)}
         if clash:
             raise SystemExit(
                 f"error: {os.path.basename(path)} already holds a DIFFERENT cell -- "
