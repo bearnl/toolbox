@@ -514,14 +514,22 @@ def fig_cohort(path, out):
         print("  (fig8 skipped: no cohorts in cohort.json)")
         return
     fig, ax = plt.subplots(figsize=(7.4, 4.6))
-    for arm, colour, lab in (("cnn_w", "#7f7f7f", "CNN"),
-                             ("met_w", DEPTH_C, "metric features"),
-                             ("geo_w", "#9467bd", "fusion")):
-        ys = [blob[str(k)]["mean"].get(arm, float("nan")) for k in Ks]
-        ax.plot(Ks, ys, "o-", color=colour, lw=2, ms=5, label=lab)
-        lo = [100 * min(blob[str(k)]["draws"].get(arm, [float("nan")])) for k in Ks]
-        hi = [100 * max(blob[str(k)]["draws"].get(arm, [float("nan")])) for k in Ks]
-        ax.fill_between(Ks, lo, hi, color=colour, alpha=0.13, lw=0)
+    # WHISKERS, NOT BANDS. The draw-to-draw range reaches 60 pp at K=4, so three
+    # overlapping translucent fills spanned most of the panel and buried the
+    # very lines they qualify. Whiskers carry the same min-max and stay legible;
+    # a small multiplicative x-offset separates the arms on a log axis.
+    for i, (arm, colour, lab) in enumerate((("cnn_w", "#7f7f7f", "CNN"),
+                                            ("met_w", DEPTH_C, "metric features"),
+                                            ("geo_w", "#9467bd", "fusion"))):
+        ys = np.array([blob[str(k)]["mean"].get(arm, float("nan")) for k in Ks])
+        lo = np.array([100 * min(blob[str(k)]["draws"].get(arm, [float("nan")]))
+                       for k in Ks])
+        hi = np.array([100 * max(blob[str(k)]["draws"].get(arm, [float("nan")]))
+                       for k in Ks])
+        xo = np.array(Ks, dtype=float) * (1.0 + 0.035 * (i - 1))
+        ax.errorbar(xo, ys, yerr=[np.clip(ys - lo, 0, None), np.clip(hi - ys, 0, None)],
+                    fmt="o-", color=colour, lw=2, ms=4.5, capsize=2.5,
+                    elinewidth=1.0, alpha=0.95, label=lab)
     ax.plot(Ks, [100.0 / k for k in Ks], ":", color="#cc3311", lw=1.6,
             label="chance (1/K)")
     for k in Ks:
@@ -531,15 +539,19 @@ def fig_cohort(path, out):
                         xytext=(0, 9), ha="center", fontsize=7.5, color="#9467bd")
     ax.set_xscale("log")
     ax.set_xticks(Ks); ax.set_xticklabels([str(k) for k in Ks])
-    ax.tick_params(axis="x", which="minor", bottom=False)
+    # minorticks_off, not tick_params: the latter hides minor TICKS but leaves
+    # their labels, so "6 x 10^0" and "2 x 10^1" printed over 7, 18 and 21.
+    ax.minorticks_off()
     ax.set_xlabel("enrolled cohort size (subjects)")
     ax.set_ylabel(f"accuracy at {meta.get('window', 25)} frames/decision (%)")
     ax.set_title("Accuracy falls with cohort size; the margin over chance grows",
                  fontsize=11)
     ax.legend(frameon=False, fontsize=8.5)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.text(0.5, -0.02, "band = min-max across cohort draws, not a confidence interval; "
-                         "x-labels give the fusion's margin over chance",
+    fig.text(0.5, -0.02, "whiskers = min-max across cohort draws, NOT a confidence "
+                         "interval: at small K a cohort can be easy or hard, and that "
+                         "range is the deployment question\nlabels above the fusion line "
+                         "give its margin over chance",
              ha="center", fontsize=8, color="#555555")
     save(fig, out, "fig8_cohort")
 
