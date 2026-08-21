@@ -410,6 +410,72 @@ def fig_conditions(prep, out, subject=None, n_show=7):
     save(fig, out, "fig6_conditions")
 
 
+def fig_operating_point(paths, out):
+    """Figure 7 -- accuracy against OBSERVATION BUDGET, gated and ungated.
+
+    This is the figure for the campaign's headline correction. Every other
+    number in the paper is per frame, which silently assumes a system must
+    answer from a single observation; a deployment watching someone walk has
+    hundreds. Plotting accuracy against frames-per-decision shows where the
+    curve FLATTENS, which is the honest operating point, and the decision count
+    printed against each x tick shows where it stops being measurable.
+
+    Two files overlay: with and without the full-body validity gate, so the two
+    independent gains -- rejecting frames the sensor could not measure, and
+    integrating over time -- are visible separately and in combination.
+    """
+    import json as _json
+    fig, ax = plt.subplots(figsize=(7.6, 4.8))
+    ARMS = (("cnn", "#7f7f7f"), ("metric", DEPTH_C), ("geo", "#9467bd"))
+    drawn = False
+    for pi, path in enumerate(paths):
+        try:
+            blob = _json.load(open(path))
+        except (OSError, ValueError):
+            print(f"  (fig7: cannot read {path})")
+            continue
+        meta = blob.get("_meta", {})
+        gated = meta.get("full_body")
+        conds = [k for k in blob if not k.startswith("_")]
+        if not conds:
+            continue
+        cond = conds[0]
+        rec = blob[cond]
+        W = [w for w in rec["windows"]]
+        xs = [len(rec["n_decisions"]) if w == 0 else w for w in W]
+        # whole-tracklet (w=0) is placed just past the largest real window
+        xmax = max(w for w in W if w > 0)
+        xs = [xmax * 2 if w == 0 else w for w in W]
+        for arm, colour in ARMS:
+            ys = [100 * rec["acc"][arm][str(w)] for w in W]
+            drawn = True
+            ax.plot(xs, ys, marker="o" if pi == 0 else "s",
+                    ls="-" if pi == 0 else "--", color=colour, lw=1.9, ms=5,
+                    markerfacecolor=colour if pi == 0 else "none",
+                    label=f"{arm}  {'gated' if gated else 'all frames'}")
+        if pi == 0:
+            for w, x in zip(W, xs):
+                n = rec["n_decisions"][str(w)]
+                ax.annotate(f"n={int(n)}", (x, 2.0), fontsize=6.5, rotation=90,
+                            ha="center", va="bottom", color="#888888")
+    if not drawn:
+        print("  (fig7 skipped: no sequence json)")
+        plt.close(fig)
+        return
+    ax.set_xscale("log", base=2)
+    ax.set_xlabel("frames per decision  (rightmost point = whole tracklet)")
+    ax.set_ylabel("frame / window accuracy (%)")
+    ax.set_title("Identity accumulates with observation, once invalid frames are refused",
+                 fontsize=10.5)
+    ax.axhline(6.34, color="#cc3311", lw=1, ls=":",
+               label="majority-class rate (gated)")
+    ax.legend(frameon=False, fontsize=7.5, ncol=2, loc="upper left")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.text(0.5, -0.02, "n = decisions behind each point; the whole-tracklet column is one "
+                         "decision per subject", ha="center", fontsize=8, color="#555555")
+    save(fig, out, "fig7_operating_point")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stats", required=True, help="stats_final.json")
@@ -417,6 +483,9 @@ def main():
     ap.add_argument("--prep", default=None, help="prep dir; enables Figure 6")
     ap.add_argument("--subject", default=None, help="Figure 6: pick this subject")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--sequence", action="append", default=None,
+                    help="sequence*.json from hiride_sequence.py; repeatable, "
+                         "gated first. Enables figure 7.")
     args = ap.parse_args()
 
     with open(args.stats) as fh:
@@ -437,6 +506,11 @@ def main():
         fig_conditions(args.prep, args.out, subject=args.subject)
     else:
         print("  (fig6 skipped: pass --prep to render the condition panel)")
+    if args.sequence:
+        fig_operating_point(args.sequence, args.out)
+    else:
+        print("  (fig7 skipped: pass --sequence to plot the operating point)")
+
     print("\nAll figures are read-only over stats_final.json / range_profile.json.")
     print("Nothing is recomputed here, so a number in a figure and the same number")
     print("in the tables cannot disagree.")

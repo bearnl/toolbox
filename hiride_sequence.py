@@ -124,6 +124,9 @@ def main():
                          "and the resulting accuracy is NOT comparable to the "
                          "unrestricted headline.")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--out-name", default="sequence.json",
+                    help="filename within --out. Gated and ungated runs must "
+                         "not overwrite each other; figure 7 reads several.")
     args = ap.parse_args()
     conds = args.condition or ["sil_scaled", "scale_removed"]
     W = [int(x) for x in args.windows.split(",")]
@@ -266,7 +269,14 @@ def main():
                             tracklet_ci=cis)
 
     if args.out:
-        path = os.path.join(args.out, "sequence.json")
+        # settings travel WITH the numbers: a curve read months later must say
+        # whether it was gated and which features it used, or it is unreadable
+        report["_meta"] = dict(policy=args.policy, modality=args.modality,
+                               arch=args.arch, features=args.features,
+                               full_body=bool(args.full_body),
+                               invariance_max=args.invariance_max,
+                               min_snr=args.min_snr, windows=W)
+        path = os.path.join(args.out, args.out_name)
         json.dump(report, open(path, "w"), indent=1)
         print(f"\n[written] {path}")
     print("\nREAD: frames inside a recording are strongly correlated, so the effective "
