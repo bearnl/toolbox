@@ -230,7 +230,7 @@ def build_convnext(input_shape, n_classes, pretrained=True, head="gap", aux_dim=
 CELL_FIELDS = ("policy", "modality", "arch", "init", "condition", "seed", "guard",
                "permuted", "bits", "depth_slab_mm", "frames", "encoding", "erode",
                "head", "eligibility", "ref_eligibility", "augment", "test_fuse",
-               "aux")
+               "aux", "cohort", "cohort_seed")
 
 
 def _axis(rec, field):
@@ -268,7 +268,8 @@ def run_tag(m):
             + (f"_g{g}" if m["policy"].startswith("R1") and g not in (None, 150) else "")
             + (f"_ref{m['ref_eligibility']}"
                if m.get("ref_eligibility", "match") != "match" else "")
-            + (f"_aux{m['aux']}" if m.get("aux", "none") != "none" else ""))
+            + (f"_aux{m['aux']}" if m.get("aux", "none") != "none" else "")
+            + (f"_k{m['cohort']}d{m['cohort_seed']}" if m.get("cohort") else ""))
 
 
 def scale_remove(img, mask, fill, is_depth, target_h=SCALE_TARGET_H,
@@ -813,6 +814,18 @@ def main():
                     help="'normals' replaces depth with 3-channel unit surface normals: "
                          "scale-free, so immune to the contrast problem, but noise "
                          "amplifying -- pair with --frames.")
+    ap.add_argument("--cohort", type=int, default=0, metavar="K",
+                    help="restrict the enrolled cohort to K subjects (0 = all). "
+                         "Accuracy is bound to gallery size -- 49.90 %% at R4 is "
+                         "on 28 people, where chance is 3.57 %% -- so a "
+                         "deployment reader needs the CURVE, not one point. "
+                         "Subjects are drawn from those present in BOTH pools "
+                         "of the policy, so every drawn class has train and "
+                         "test frames.")
+    ap.add_argument("--cohort-seed", type=int, default=0, metavar="S",
+                    help="which draw of K subjects. Vary it: a single subset is "
+                         "one sample of an easy-or-hard cohort, not a "
+                         "measurement of cohort size.")
     ap.add_argument("--aux", choices=("none", "dist"), default="none",
                     help="`dist` appends the subject's standing distance "
                          "(cues p_med, z-scored on TRAIN rows) to the pooled "
@@ -887,6 +900,26 @@ def main():
                       man, guard=args.ref_guard, seed=0,
                       keep=ref_keep if ref_keep is not None else keep))
     tr, va, te = make_split(man, args.policy, seed=args.seed, keep=keep, **kw)
+    if args.cohort:
+        # Draw from subjects present in BOTH pools, so a drawn class cannot land
+        # in training with no test frames (or the reverse) and quietly change
+        # what K means. Split once to find them, then re-split on the subset.
+        subj = np.asarray(man["subject"], dtype=str)
+        common = sorted(set(subj[tr].tolist()) & set(subj[te].tolist()))
+        if args.cohort > len(common):
+            raise SystemExit(f"error: --cohort {args.cohort} exceeds the "
+                             f"{len(common)} subjects present in both pools of "
+                             f"{args.policy}")
+        pick = set(np.random.default_rng([args.cohort_seed, args.cohort]).choice(
+            np.array(common), size=args.cohort, replace=False).tolist())
+        keep = keep & np.isin(subj, list(pick))
+        if args.policy.startswith("R1"):
+            kw = dict(kw, match_ntrain=block_train_counts(
+                man, guard=args.ref_guard, seed=0,
+                keep=(ref_keep if ref_keep is not None else keep) & np.isin(subj, list(pick))))
+        tr, va, te = make_split(man, args.policy, seed=args.seed, keep=keep, **kw)
+        print(f"[cohort] K={args.cohort} draw {args.cohort_seed} of {len(common)} "
+              f"eligible: {sorted(pick)}")
     info = describe_split(man, tr, va, te)
 
     classes = sorted(set(man["subject"][tr].tolist()))
@@ -1050,7 +1083,7 @@ def main():
         depth_clip_mm=DEPTH_CLIP_MM, bits=args.bits, depth_slab_mm=args.depth_slab_mm,
         frames=args.frames, encoding=args.depth_encoding, erode=args.erode, head=args.head,
         eligibility=args.eligibility, ref_eligibility=args.ref_eligibility,
-        aux=args.aux,
+        aux=args.aux, cohort=args.cohort, cohort_seed=args.cohort_seed,
         augment=args.augment, **fused,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),

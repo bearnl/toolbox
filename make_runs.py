@@ -370,10 +370,36 @@ WAVE17 = dict(
 )
 
 
+# Wave 18 -- HOW DOES THE OPERATING POINT SCALE WITH COHORT SIZE?
+#
+# 49.90 % at R4 is on 28 enrolled people, where chance is 3.57 %. That number
+# is bound to the gallery it was measured on, and a deployment reader needs the
+# CURVE so they can locate their own cohort on it -- a care bedroom enrolling
+# six residents and a ward enrolling sixty are not the same problem.
+#
+# This is the GPU half of the external-validity work (handoff section 3): the
+# metric-feature curve is CPU and hiride_cohort.py does it properly by
+# retraining the RandomForest per cohort. Here the CNN is retrained per cohort
+# too, which also validates the cheap posterior-restriction approximation that
+# hiride_cohort.py uses for the CNN arm.
+#
+# THREE DRAWS PER K, because one subset of 7 people is a sample of an
+# easy-or-hard cohort, not a measurement of cohort size. Two seeds each, so
+# subset variance and initialisation variance are separable.
+WAVE18 = dict(
+    policies=["R4_cross_session", "R3_cross_recording"],
+    recipe="--head stripe --augment 8 --test-fuse 10",
+    condition="scale_removed",
+    cohorts=[7, 14, 21],
+    draws=[0, 1, 2],
+    seeds=[0, 1],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -457,6 +483,15 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 18:
+        for policy in WAVE18["policies"]:
+            for k in WAVE18["cohorts"]:
+                for d in WAVE18["draws"]:
+                    for seed in WAVE18["seeds"]:
+                        lines.append(
+                            f"--policy {policy} --modality depth --arch alexnet "
+                            f"--condition {WAVE18['condition']} --seed {seed} "
+                            f"--cohort {k} --cohort-seed {d} {WAVE18['recipe']}")
     elif args.wave == 17:
         for policy, extra in WAVE17["policies"]:
             for cond, _why in WAVE17["conditions"]:
