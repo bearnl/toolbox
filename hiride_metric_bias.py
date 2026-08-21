@@ -34,6 +34,14 @@ import numpy as np
 
 from hiride_data import load_manifest
 from hiride_fuse import load_metric
+from hiride_metric import NUISANCE, SHAPE_PREFIXES
+
+
+# Testing/Walking spans 1585-3800 mm, so a feature's drift across the walk is
+# |slope| * this. Divided by between-subject SD it gives one number for "does
+# this measure the person or the range" -- below ~0.5 is usable, above 1 means
+# the range moves it further than people differ.
+TEST_RANGE_M = 2.2
 
 
 def main():
@@ -49,6 +57,15 @@ def main():
     p_med = z["cues"][:, feats.index("p_med")].astype(np.float64)
     mf = np.load(os.path.join(args.prep, "metric_features.npz"), allow_pickle=False)
     names = [str(n) for n in mf["names"]]
+    # Analyse EVERY measurable column, not the pinned publication set.
+    # load_metric returns BASE_METRIC so the published numbers keep reproducing;
+    # a diagnostic asking "which features are range-invariant" must see the new
+    # candidates too, or it can never rank them. Nuisance covariates are
+    # excluded because their range dependence is the point of them.
+    cols = [i for i, n in enumerate(names)
+            if n not in NUISANCE and not n.startswith("bone_")]
+    print(f"[bias] analysing {len(cols)} of {len(names)} columns "
+          f"({sum(n.startswith(SHAPE_PREFIXES) for n in names)} crown-anchored)")
     seq = np.asarray(man["seq"], dtype=str)
     subj = np.asarray(man["subject"], dtype=str)
 
@@ -86,8 +103,9 @@ def main():
           "\ncentred feature on centred distance pooled over everyone. One slope, "
           "\napplicable to a stranger.\n")
     hdr = (f"{'feature':<18s}{'between-SD':>12s}{'within-SD':>11s}{'slope/m':>10s}"
-           f"{'var expl':>10s}{'SNR gain':>10s}")
+           f"{'var expl':>10s}{'SNR gain':>10s}{'drift/sig':>10s}")
     print(hdr); print("-" * len(hdr))
+    rows_out = []
     for c in cols:
         yc, xc, betw = [], [], []
         for s_ in sorted(set(seq)):
@@ -110,8 +128,14 @@ def main():
         b_sd = float(np.std(betw))
         expl = 1.0 - (w_sd_c ** 2) / max(w_sd ** 2, 1e-12)
         gain = (w_sd / w_sd_c - 1.0) * 100 if w_sd_c > 0 else 0.0
-        print(f"{names[c]:<18s}{b_sd:>12.2f}{w_sd:>11.2f}{slope:>10.2f}"
-              f"{100 * expl:>9.1f}%{gain:>9.1f}%")
+        # drift across the test corpus's own range, against the identity signal:
+        # the ratio that says whether a feature measures the person or the range
+        drift = abs(slope) * TEST_RANGE_M
+        rows_out.append((drift / max(b_sd, 1e-9), names[c], b_sd, w_sd, slope,
+                         expl, gain, drift))
+    for ratio, nm, b_sd, w_sd, slope, expl, gain, drift in sorted(rows_out):
+        print(f"{nm:<18s}{b_sd:>12.2f}{w_sd:>11.2f}{slope:>10.2f}"
+              f"{100 * expl:>9.1f}%{gain:>9.1f}%{ratio:>10.2f}")
 
     print("\nREAD: `between-SD` is the identity signal; `within-SD` is what it must beat."
           "\n`slope/m` is how far the feature drifts per metre of standing distance -- for a"
