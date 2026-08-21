@@ -67,9 +67,26 @@ runs with per-frame predictions. Code: `git@github.com:bearnl/toolbox`, `master`
 
 **The deployment claim this supports.** Lowering Z-precision is not a privacy control, and
 neither is masking the person out (`bg_hole` leaves a silhouette-shaped hole and scores
-*above* the full frame at R3). What leaks is the outline. The honest operating point is
-~15 % on a 28-person enrolled cohort — several times chance, far from usable
-identification, and enough to refute "depth is anonymous because humans cannot read it".
+*above* the full frame at R3). What leaks is the outline.
+
+**THE OPERATING POINT IS ~50 %, NOT ~15 % — corrected 2026-08-21, see §13.12/§13.17.**
+The ~15 % figure assumed a single frame and required an answer on every frame, including
+the 74 % of walking frames where the body is clipped and the measurement is invalid. Give
+the system what a deployment actually has — the sensor's own user segmentation, and 2.5
+seconds of observation — and R4 depth reaches:
+
+| gated, 25 frames/decision, R4 | accuracy | subject-cluster CI |
+|---|---|---|
+| CNN alone (`stripe/aug8/tf10`) | 32.62 % | [+17.7, +48.4] |
+| metric features alone | 43.30 % | [+30.3, +56.1] |
+| **fusion of the two** | **49.90 %** | **[+34.4, +65.4]** |
+
+against chance 3.57 % and majority 6.34 %, on 103 decisions. **Report all three**: the
+fusion is not the CNN's number. This strengthens the privacy conclusion rather than
+weakening it — ~50 % on a 28-person enrolled cohort from two and a half seconds of depth
+video refutes "depth is anonymous because humans cannot read it" far more firmly than
+~15 % did. It remains far from usable open-world identification, which is the honest
+limit to state.
 
 **What must NOT be misread** (both documented in the code, restate both in the paper):
 - `bg_plate` at R0/R1 scores 97–100 % and that is **structural, not a scene measurement**.
@@ -1918,9 +1935,17 @@ two must never be quoted as though they were the same.
 metric features nearly double. Systematic error does not average away; noise
 does. Same signature as 13.10's `rescued` column.
 
-**What this does to the paper.** §0's "the honest operating point is ~15 % on a
-28-person enrolled cohort" is wrong and must be rewritten to ~43 % from 2.5 s of
-observation with clipped frames rejected. The privacy conclusion gets STRONGER,
+**What this does to the paper.** §0 is now rewritten. FINAL NUMBERS use the best
+recipe (`alexnet/stripe/aug8/tf10`, `scale_removed`), not the gap-head cell this
+section was first written from: at 25 frames/decision, CNN 32.62 % [+17.7, +48.4],
+metric 43.30 % [+30.3, +56.1], fusion 49.90 % [+34.4, +65.4].
+
+**And the best recipe changed the CNN's character, which is a result in itself.** The
+gap-head CNN gained nothing from integration (16.39 -> 19.61 -> 20.00 across the
+window sweep); the augmented one gains steadily (23.40 -> 32.62 -> 37.78). Augmentation
+makes the model invariant to framing, which converts SYSTEMATIC error into noise -- and
+noise is the only kind integration can remove. That is the mechanism behind §13.10's
+`rescued` column and §13.17's finding that the plain CNN's errors do not average away. The privacy conclusion gets STRONGER,
 not weaker: "depth is anonymous because humans cannot read it" is refuted much
 more firmly by 43 % than by 15 %. The deployment sentence should now distinguish
 a single frame (~19 %, and ~9 % if the body is clipped) from a short observation
@@ -2252,7 +2277,9 @@ exclusion rather than a shrug.
    retrain. ~8 pp of headroom is proven to exist by the oracle bound; whether a
    joint model reaches it is the question. Cheap: one wave, R4 + R3, three
    conditions, 5 seeds.
-7. **Re-run 13.12's composition with the best CNN recipe** (`stripe/aug8/tf10`,
+7. ~~**Re-run 13.12's composition with the best CNN recipe**~~ DONE — numbers
+   in §13.12. Remaining: regenerate every figure and table quoting an R4 number,
+   and settle the external-validity question in §3 before drafting. Old item: (`stripe/aug8/tf10`,
    18.01 % at R4 rather than the 14.59 % gap-head cell used there) and with more
    seeds, then regenerate every figure and table that quotes an R4 number.
 8. Have the trainer save posteriors for VALIDATION rows, not just test rows.
