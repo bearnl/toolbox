@@ -1924,6 +1924,78 @@ after integration. Settling it needs more SUBJECTS, not more columns: n = 28 is
 the binding constraint here exactly as it has been for every other claim in this
 campaign.
 
+### 13.14 Feature reference — all 53 columns in `metric_features.npz`
+
+Computed by `hiride_metric.py` from the RAW tree: each frame's person pixels are
+unprojected with the Kinect intrinsics (fx = fy = 575.816, cx = 320, cy = 240)
+into a GRAVITY-ALIGNED frame using the per-frame ground plane, giving three
+body axes — `h` (height above ground), `lat` (across), `dep` (front-to-back).
+Every length below is millimetres in that frame, so it is comparable between
+people and cameras by construction. `drift` is the range-stability figure from
+§13.12/§13.13: |slope per metre| x 2.2 m over between-subject SD. Below ~0.5 is
+usable; above 1 the feature moves more with standing distance than it varies
+between people.
+
+**A. Nuisance and validity — 6 columns, excluded from `metric` by default**
+
+| column | meaning |
+|---|---|
+| `stand_dist_mm` | median depth of person pixels. THE range covariate. Adding it as a feature costs 10 pp at R1 (67.97 -> 57.59) because it is a recording shortcut |
+| `ground` | 1 if a real ground plane was used, 0 if the camera -Y fallback |
+| `n_points`, `valid_frac` | person pixel count; fraction of frame with valid depth |
+| `top_clip`, `bot_clip` | mask touches the top / bottom frame row. **`bot_clip` is the one that matters** — it drives the full-body gate that lifts R4 from 19.04 % to 28.06 % |
+
+**B. `BASE_METRIC` — the 12 published columns (19.04 % at R4, PINNED)**
+
+| column | meaning | drift |
+|---|---|---|
+| `stature_mm` | p99.5 - p0.5 of `h`. Standing height | 1.87 |
+| `height_p50`, `height_p05` | median / 5th pct of `h` above the base. Mass distribution | 2.11 / 1.92 |
+| `depth_extent_mm` | p99 - p1 of `dep`. ONE whole-body thickness number | 1.54 |
+| `w_15` ... `w_90` | lateral width (p97.5 - p2.5 of `lat`) in a band at that FRACTION OF STATURE above the base, half-width 4 % of stature | 0.04 – 2.34 |
+| `surface_area_m2` | sum of per-pixel areas (z/fx)(z/fy). Build proxy | 1.55 |
+| `volume_proxy_l` | surface area x depth extent | 1.78 |
+
+**The defect in this block:** the `w_XX` bands are anchored at `base` (the
+bottom of the VISIBLE body) and scaled by `stature`. Both break when the feet
+leave frame — 98 % of close-range frames — so the band lands on different
+anatomy depending only on how much was clipped. Band position error is
+`stature_error x f`, and the width error is that times the width GRADIENT, so
+`w_75` (shoulders, steepest gradient) is worst at 2.34 while `w_15`/`w_30` sit
+beside the anchor and barely move.
+
+**C. Crown-anchored shape block — 35 columns (`shape`)**
+
+Eight bands at absolute offsets d ∈ {100 ... 800} mm BELOW THE CROWN
+(p99.5 of `h`), half-width 40 mm. Absolute offsets from the top, because the
+crown is visible far more often than the feet (top-touch 0.43 vs bottom-touch
+0.98 at close range) and a millimetre offset is anatomically stable however
+much of the legs is missing. On a ~1750 mm adult: 100 = mid-head, 200 =
+chin/neck, 300 = shoulders, 400 = chest, 500 = lower chest, 600 = waist,
+700 = hip, 800 = thigh.
+
+| family | count | meaning | drift range |
+|---|---|---|---|
+| `hw_ddd` | 8 | lateral width in the band | 0.33 (hw_200) – 2.20 (hw_400) |
+| `ht_ddd` | 8 | **thickness** front-to-back in the band. A NEW AXIS — the old set had one global `depth_extent_mm` for the whole body, where chest-vs-waist depth is a standard anthropometric discriminator | **0.10 – 0.91, the most range-stable family in the set** |
+| `hc_ddd` | 8 | Ramanujan elliptical circumference from semi-axes w/2, t/2 — the circumference a tailor would tape, from the two axes the sensor can see | 1.12 – 2.21 |
+| `ha_ddd` | 8 | aspect ratio t/w. Scale-free, so it cancels whatever the crown anchor still gets wrong | 0.32 (ha_200) – 3.91 |
+| `r_a_b` | 3 | width ratios `hw_a / hw_b` for (200,700), (200,400), (400,700). Shoulder-over-hip and neighbours; scale-free | 0.53 – 0.86 |
+
+**What the block bought.** Frame-level at R4 on full-body frames:
+`metric` 28.06 % -> `metric+shape` **32.06 %**; at R3, 21.91 % -> **33.62 %**.
+`shape` ALONE is worse (18.70 %) — the value is in combination. And the gain
+INVERTS under aggregation (§13.13), because drifting features produce errors
+correlated across a tracklet.
+
+**NO SKELETON COLUMNS EXIST.** 53 = 6 + 12 + 35 exactly, so the `bone_` path in
+`hiride_metric.py` produced nothing and `hiride_metric_floor.py`'s `skeleton`
+and `both` sets never appear. Limb proportions — leg length against torso, the
+most obviously identity-bearing geometry a body has — are therefore NOT
+measured anywhere in this campaign, because they need joint landmarks that
+neither the silhouette nor these features provide. If BIWI ships `*_skel.txt`,
+this is the single largest gap in the feature set.
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
