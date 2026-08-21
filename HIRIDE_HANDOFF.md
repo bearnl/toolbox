@@ -2244,6 +2244,57 @@ network the calibration it lacks?* Yes, and it did not help. Report it in the
 negative-results section with the R3 power bound, which is what makes it an
 exclusion rather than a shrug.
 
+### 13.18 Cohort-size curve — external validity, axis 1 of 2
+
+49.90 % at R4 is on 28 enrolled people where chance is 3.57 %, and that number
+is bound to its gallery. `hiride_cohort.py` measures the curve: 12 draws per
+cohort size, the RandomForest RETRAINED on exactly the K enrolled subjects
+(the CNN arm is approximated — see below), full-body gated, 25 frames/decision,
+best recipe.
+
+| K | chance | cnn @W | metric @W | fusion @W | x chance | spread across draws |
+|---|---|---|---|---|---|---|
+| 4 | 25.00 % | 67.51 | **83.85** | 75.24 | 3.0x | **60.0 pp** |
+| 7 | 14.29 % | 58.70 | 70.31 | 73.13 | 5.1x | 31.3 pp |
+| 10 | 10.00 % | 58.64 | 63.00 | 73.15 | 7.3x | 36.2 pp |
+| 14 | 7.14 % | 43.16 | 56.86 | 60.39 | 8.5x | 25.8 pp |
+| 18 | 5.56 % | 42.15 | 52.47 | 59.34 | 10.7x | 16.6 pp |
+| 21 | 4.76 % | 38.17 | 50.08 | 55.42 | 11.6x | 14.4 pp |
+| 24 | 4.17 % | 35.04 | 47.20 | 52.90 | 12.7x | 10.4 pp |
+| 28 | 3.57 % | 32.62 | 43.30 | 50.29 | 14.1x | 0.0 pp |
+
+**Three findings, and the third is the one to lead with.**
+
+1. **Accuracy falls, margin over chance RISES** — 3.0x to 14.1x, monotone. The
+   system becomes less accurate and more informative as the cohort grows. State
+   both; the raw curve alone reads as degradation and the ratio alone hides the
+   operating point.
+2. **Fusion is not always better.** At K=4 it is WORSE than metric features
+   alone (75.24 vs 83.85): folding a weak CNN into a strong geometric model
+   costs accuracy when the gallery is small. Do not present fusion as
+   uniformly best.
+3. **AT SMALL COHORTS, IDENTIFIABILITY DEPENDS ON WHO ELSE IS ENROLLED.** The
+   spread across 12 draws at K=4 is **60 pp** — some four-person cohorts are
+   near-perfectly separable, others near chance — and it falls monotonically to
+   0 pp at K=28, where only one cohort exists. A designer cannot choose their
+   residents, so for a household or care-bedroom deployment the RANGE is the
+   honest quantity and the mean is close to meaningless. This is the most
+   deployment-relevant result in the campaign and it has no analogue in the
+   frame-level tables.
+
+**The CNN arm is APPROXIMATED**: trained once on 28 classes with only the
+decision restricted to K columns. Wave 18 (`20239791`, 36 cells) retrains it
+per cohort at K = 7/14/21 with the SAME draws, so the size of that
+approximation is measurable rather than assumed. Until it lands, **quote the
+metric arm, not the CNN arm**. If they agree the cheap method is validated for
+reuse; if not, substitute the GPU points and say so.
+
+**Axis 2 — a second corpus — is BLOCKED.** `$SCRATCH/datasets` holds only
+BIWI (`Training.rar`, `Testing.rar`). A second corpus needs a download and a
+prep path, so it cannot be an overnight job. The cohort curve strengthens the
+COHORT axis only; room, camera pose and protocol remain single-sourced, and
+§3's three options still stand.
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
