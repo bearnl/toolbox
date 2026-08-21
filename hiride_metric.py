@@ -1,4 +1,7 @@
-"""Metric 3D + skeleton features: use depth AS GEOMETRY, not as a grey image.
+"""Metric 3D features: use depth AS GEOMETRY, not as a grey image.
+
+NO SKELETON. Paper 1 is published and skeleton-only, so _skel.txt is
+off-limits to paper 2 entirely (territory decision, 2026-08-19).
 
     python hiride_metric.py --prep $SCRATCH/hiride2/prep --root $SLURM_TMPDIR/biwi
 
@@ -31,7 +34,6 @@ Features written per frame (all camera-invariant unless marked):
     n_points, valid_frac
     top_clip/bot_clip     mask touches the frame edge -> stature unmeasurable
     stand_dist_mm         NUISANCE, kept only as a covariate
-    bone_*                skeleton segment lengths, if _skel.txt parses
 
 NOTHING EXISTING IS MODIFIED. This writes one new file, metric_features.npz,
 and derives the skel/groundCoeff paths from the depth path via BIWI's fixed
@@ -55,7 +57,7 @@ from hiride_pgm import read_pgm
 FX = FY = 575.816
 CX, CY = 320.0, 240.0
 WIDTH_FRACS = (0.15, 0.30, 0.45, 0.60, 0.75, 0.90)
-_LOGGED = {"ground": False, "skel": False}
+_LOGGED = {"ground": False}
 
 
 def sibling(depth_rel, slot, kind, ext):
@@ -98,23 +100,6 @@ def read_ground(path):
     if np.linalg.norm(n) < 1e-6:
         return None
     return v[:4]
-
-
-def read_skel(path):
-    v, txt = read_floats(path)
-    if not _LOGGED["skel"]:
-        _LOGGED["skel"] = True
-        print(f"[format] skel first file: {os.path.basename(path)}\n"
-              f"         raw head: {(txt or '')[:300]!r}\n"
-              f"         parsed {0 if v is None else len(v)} floats")
-    if v is None or len(v) < 9:
-        return None
-    for stride in (3, 4, 9, 12):                 # xyz / xyz+conf / +rotation
-        if len(v) % stride == 0 and len(v) // stride >= 3:
-            pts = v.reshape(-1, stride)[:, :3]
-            if np.isfinite(pts).all() and np.abs(pts).max() < 1e5:
-                return pts
-    return None
 
 
 # The 12 columns the published numbers were computed from (19.04 % at R4,
@@ -249,7 +234,7 @@ def main():
     want = {key(ref, i): i for i in range(len(ref["frame"]))}
 
     names, rows, mrow = None, [], []
-    bone_names, n_ground, n_skel = None, 0, 0
+    n_ground = 0
     order = range(0, len(raw["frame"]), max(1, args.stride))
     for c, i in enumerate(order):
         k = key(raw, i)
@@ -268,21 +253,13 @@ def main():
             continue
         n_ground += int(f.get("ground", 0) > 0)
 
-        s = sibling(raw["depth"][i], "d", "skel", "txt")
-        pts = read_skel(os.path.join(raw["root"], s)) if s else None
-        if pts is not None and len(pts) >= 4:
-            n_skel += 1
-            k_j = min(len(pts), 15)
-            d = []
-            nm = []
-            for a in range(k_j):
-                for b in range(a + 1, k_j):
-                    d.append(float(np.linalg.norm(pts[a] - pts[b])))
-                    nm.append(f"bone_{a:02d}_{b:02d}")
-            if bone_names is None:
-                bone_names = nm
-            if len(d) == len(bone_names):
-                f.update(dict(zip(bone_names, d)))
+        # _skel.txt IS NOT READ. Paper 1 is published, skeleton-only, and its
+        # feature vector is 20-D bone-segment lengths; the territory decision of
+        # 2026-08-19 puts _skel.txt off-limits to paper 2 ENTIRELY, including as
+        # a pose covariate (Testing/Still provides pose control instead). This
+        # is enforced here deliberately rather than left to the two parser bugs
+        # that used to enforce it by accident -- see 13.16 for both, recorded
+        # for whoever does own this material.
 
         if names is None:
             names = sorted(f)
@@ -298,8 +275,6 @@ def main():
           f"{os.path.join(out_dir, 'metric_features.npz')}")
     print(f"  ground plane parsed on {n_ground}/{len(rows)} frames "
           f"({'USED' if n_ground else 'FELL BACK to camera-Y -- check the format log above'})")
-    print(f"  skeleton parsed on {n_skel}/{len(rows)} frames"
-          + (f", {len(bone_names)} segment lengths" if bone_names else " -- no skeleton features"))
     if F.shape[0]:
         for n in ("stature_mm", "w_45", "surface_area_m2", "volume_proxy_l", "stand_dist_mm"):
             if n in names:

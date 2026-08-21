@@ -2052,23 +2052,49 @@ mechanism conditions with an RGB-DERIVED segmentation (a pretrained person
 segmenter, or GrabCut) and report the difference. That converts a caveat into a
 measurement. Not run; scoped and honest to omit with the caveat stated.
 
-### 13.16 Skeletons exist but do not track — 168 of 28,037 frames
+### 13.16 Skeletons: NOT paper 2's material — and the earlier entry was wrong twice
 
-`Training.rar` holds 23,904 `_skel.txt` files and `Testing.rar` 15,377 — one per
-frame, 39,281 total. But `hiride_metric.py` reports **skeleton parsed on
-168/28037 frames, 105 segment lengths**. 105 = C(15,2), so where it works it
-recovers all 15 NITE joints; it simply almost never works.
+An earlier version of this section said skeleton tracking had failed and urged
+fixing it. **Both halves were wrong.**
 
-The likely cause is the data, not the parser: NITE skeleton tracking needs a
-calibration pose and fails for seated subjects, which is what BIWI's head-pose
-protocol records. VERIFY by dumping a failing file against the one that parsed
-(`000a_000009-d_111627673_skel.txt`) before touching `read_skel`.
+**Wrong on territory, which is what matters.** §11.1 settled it on 2026-08-19:
+paper 1 is PUBLISHED and skeleton-only, a 20-D bone-segment-length feature
+vector on 14 participants. `_skel.txt` is off-limits to paper 2 **entirely**,
+including as a pose covariate — `Testing/Still` provides pose control instead.
+Bone-segment lengths and limb-proportion ratios ARE paper 1's contribution, so
+building them here would have cannibalised a published paper of the author's
+own. This was checked only after the features were written; the code is
+reverted and `hiride_metric.py` now declines to read `_skel.txt` deliberately,
+with the reason in a comment at the call site, rather than leaving the boundary
+to be enforced by accident.
 
-If the files are genuinely empty, limb proportions — the scale-free,
-clothing-invariant geometry most likely to survive a session change — are
-unavailable on this dataset, and that belongs in Limitations beside the gait
-finding (§13.8) as a second concrete requirement for the paper-3 corpus:
-**skeleton tracking that holds through the recording.**
+**Wrong on the facts, recorded for whoever DOES own this material.** The
+skeletons track fine. Every frame ships one (23,904 in `Training.rar`, 15,377
+in `Testing.rar`, 39,281 total), and the files hold a fully-populated
+20-joint Microsoft Kinect SDK v1 skeleton — 14 columns per joint: a leading
+constant, XYZ in metres, the 2D projection, confidence, a spare, PARENT and
+JOINT indices, then a quaternion. The parent links confirm the layout
+(0->1->2->3 hip-centre/spine/shoulder-centre/head, 2->4..7 and 2->8..11 arms,
+0->12..15 and 0->16..19 legs), and one inspected frame gives head Y +0.733 m
+against feet -0.968 m: a 1.70 m stature.
+
+The "168 of 28,037 frames" figure came from two bugs, both now documented and
+both worth knowing before anyone tries again:
+
+1. `sibling()` reused the DEPTH stream's timestamp to name the skel file. Each
+   BIWI stream carries its own, so the derived name usually does not exist —
+   the 168 were frames where two streams happened to be stamped identically.
+   Glob the frame prefix instead.
+2. `read_skel()` tried strides 3/4/9/12 and took the first that divided the
+   float count. 20 joints x 14 columns = 280 floats, which 4 divides, so where
+   it ran at all it returned 70 misaligned "joints" from a 20-joint file. Parse
+   by column and index by the file's own joint id.
+
+**For paper 2 this changes nothing.** The relevant consequence is the opposite
+of what the earlier entry claimed: limb proportions are not a gap in paper 2's
+feature set, they are another paper's result. What paper 2 can say is that a
+CNN on raw depth does not recover geometry that tracked joints make explicit —
+citing paper 1 for the joints, claiming nothing from them.
 
 ### 13.11 Open items
 
