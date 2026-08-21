@@ -71,7 +71,7 @@ def main():
 
     hdr = (f"{'K':>4s}{'chance':>9s}{'draws':>7s}{'cnn frame':>11s}{'metric frame':>14s}"
            f"{'cnn @W':>9s}{'metric @W':>12s}{'geo @W':>9s}{'x chance':>10s}"
-           f"{'spread @W':>11s}")
+           f"{'spread @W':>11s}{'cnn retrain':>13s}")
     print(f"\n{args.policy}  {args.modality}  {args.arch}  {args.condition}"
           f"{'  [full-body gated]' if args.full_body else ''}"
           f"   W={args.window} frames/decision\n")
@@ -81,7 +81,7 @@ def main():
                             full_body=bool(args.full_body), window=args.window,
                             cohorts=Ks, draws=args.draws)}
     for K in Ks:
-        per = {k: [] for k in ("cnn_f", "met_f", "cnn_w", "met_w", "geo_w")}
+        per = {k: [] for k in ("cnn_f", "met_f", "cnn_w", "met_w", "geo_w", "cnn_rt")}
         for d in range(args.draws):
             accs = {k: [] for k in per}
             for meta, cm_path in cells:
@@ -129,6 +129,19 @@ def main():
                 # cidx now follows sorted(pick), so this is cmapK's order too
                 gold = np.array([cmapK[s] for s in subj_all[rs]])
                 accs["cnn_f"].append(float((sub.argmax(1) == gold).mean()))
+                # The RETRAINED counterpart, if wave 18 covered this (K, draw).
+                # Evaluated on the same gated frames as the approximation, and
+                # both were TRAINED ungated, so the only difference is whether
+                # the network saw K classes or 28.
+                for _rm, rpath in cnn_cells(args.runs, args.policy, args.modality,
+                                            args.arch, f"{args.condition}/k{K}d{d}"):
+                    rz = np.load(rpath, allow_pickle=False)
+                    rr = rz["test_rows"]
+                    rsel = have[rr] & (gate[rr] if gate is not None else True)
+                    if rsel.sum() < 30:
+                        continue
+                    accs["cnn_rt"].append(
+                        float((rz["pred"][rsel] == rz["truth"][rsel]).mean()))
                 # metric: genuinely retrained on the K enrolled subjects
                 rf = RandomForestClassifier(n_estimators=300, random_state=seed,
                                             n_jobs=-1)
@@ -167,7 +180,8 @@ def main():
         print(f"{K:>4d}{100/K:>8.2f}%{len(per['met_w']):>7d}{m['cnn_f']:>10.2f}%"
               f"{m['met_f']:>13.2f}%{m['cnn_w']:>8.2f}%{m['met_w']:>11.2f}%"
               f"{m['geo_w']:>8.2f}%{m['geo_w'] * K / 100:>9.1f}x"
-              f"{spread:>10.1f}pp")
+              f"{spread:>10.1f}pp"
+              + (f"{m['cnn_rt']:>11.2f}% " if 'cnn_rt' in m else f"{'--':>13s}"))
         report[str(K)] = dict(mean=m, spread_geo_w=spread,
                               draws={k: v for k, v in per.items()})
 

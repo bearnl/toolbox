@@ -548,7 +548,7 @@ def fig_cohort(path, out):
                  fontsize=11)
     ax.legend(frameon=False, fontsize=8.5)
     ax.spines[["top", "right"]].set_visible(False)
-    fig.text(0.5, -0.02, "whiskers = min-max across cohort draws, NOT a confidence "
+    fig.text(0.5, -0.13, "whiskers = min-max across cohort draws, NOT a confidence "
                          "interval: at small K a cohort can be easy or hard, and that "
                          "range is the deployment question\nlabels above the fusion line "
                          "give its margin over chance",
