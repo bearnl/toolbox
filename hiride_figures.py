@@ -488,6 +488,62 @@ def fig_operating_point(paths, out):
     save(fig, out, "fig7_operating_point")
 
 
+def fig_cohort(path, out):
+    """Figure 8 -- the operating point against enrolled cohort size.
+
+    Absolute accuracy must fall as the gallery grows, so the raw curve alone
+    reads as degradation. The chance line underneath is what makes it readable:
+    the MARGIN over chance grows while accuracy falls, so the system becomes
+    less accurate and more informative at the same time.
+
+    The band is the min-max range across cohort draws, not a confidence
+    interval. At small K a particular set of people can be easy or hard, and
+    that variation is a property of the deployment question rather than noise
+    to be averaged away -- a reader enrolling four residents wants to know the
+    range they might land in.
+    """
+    import json as _json
+    try:
+        blob = _json.load(open(path))
+    except (OSError, ValueError):
+        print(f"  (fig8: cannot read {path})")
+        return
+    meta = blob.get("_meta", {})
+    Ks = sorted(int(k) for k in blob if not k.startswith("_"))
+    if not Ks:
+        print("  (fig8 skipped: no cohorts in cohort.json)")
+        return
+    fig, ax = plt.subplots(figsize=(7.4, 4.6))
+    for arm, colour, lab in (("cnn_w", "#7f7f7f", "CNN"),
+                             ("met_w", DEPTH_C, "metric features"),
+                             ("geo_w", "#9467bd", "fusion")):
+        ys = [blob[str(k)]["mean"].get(arm, float("nan")) for k in Ks]
+        ax.plot(Ks, ys, "o-", color=colour, lw=2, ms=5, label=lab)
+        lo = [100 * min(blob[str(k)]["draws"].get(arm, [float("nan")])) for k in Ks]
+        hi = [100 * max(blob[str(k)]["draws"].get(arm, [float("nan")])) for k in Ks]
+        ax.fill_between(Ks, lo, hi, color=colour, alpha=0.13, lw=0)
+    ax.plot(Ks, [100.0 / k for k in Ks], ":", color="#cc3311", lw=1.6,
+            label="chance (1/K)")
+    for k in Ks:
+        g = blob[str(k)]["mean"].get("geo_w")
+        if g:
+            ax.annotate(f"{g * k / 100:.0f}x", (k, g), textcoords="offset points",
+                        xytext=(0, 9), ha="center", fontsize=7.5, color="#9467bd")
+    ax.set_xscale("log")
+    ax.set_xticks(Ks); ax.set_xticklabels([str(k) for k in Ks])
+    ax.tick_params(axis="x", which="minor", bottom=False)
+    ax.set_xlabel("enrolled cohort size (subjects)")
+    ax.set_ylabel(f"accuracy at {meta.get('window', 25)} frames/decision (%)")
+    ax.set_title("Accuracy falls with cohort size; the margin over chance grows",
+                 fontsize=11)
+    ax.legend(frameon=False, fontsize=8.5)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.text(0.5, -0.02, "band = min-max across cohort draws, not a confidence interval; "
+                         "x-labels give the fusion's margin over chance",
+             ha="center", fontsize=8, color="#555555")
+    save(fig, out, "fig8_cohort")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--stats", required=True, help="stats_final.json")
@@ -495,6 +551,8 @@ def main():
     ap.add_argument("--prep", default=None, help="prep dir; enables Figure 6")
     ap.add_argument("--subject", default=None, help="Figure 6: pick this subject")
     ap.add_argument("--out", required=True)
+    ap.add_argument("--cohort", default=None,
+                    help="cohort.json from hiride_cohort.py. Enables figure 8.")
     ap.add_argument("--sequence", action="append", default=None,
                     help="sequence*.json from hiride_sequence.py; repeatable, "
                          "gated first. Enables figure 7.")
@@ -518,6 +576,8 @@ def main():
         fig_conditions(args.prep, args.out, subject=args.subject)
     else:
         print("  (fig6 skipped: pass --prep to render the condition panel)")
+    if args.cohort:
+        fig_cohort(args.cohort, args.out)
     if args.sequence:
         fig_operating_point(args.sequence, args.out)
     else:
