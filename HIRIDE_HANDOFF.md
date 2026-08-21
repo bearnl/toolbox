@@ -2282,12 +2282,44 @@ best recipe.
    deployment-relevant result in the campaign and it has no analogue in the
    frame-level tables.
 
-**The CNN arm is APPROXIMATED**: trained once on 28 classes with only the
-decision restricted to K columns. Wave 18 (`20239791`, 36 cells) retrains it
-per cohort at K = 7/14/21 with the SAME draws, so the size of that
-approximation is measurable rather than assumed. Until it lands, **quote the
-metric arm, not the CNN arm**. If they agree the cheap method is validated for
-reuse; if not, substitute the GPU points and say so.
+**THE CNN ARM IS OPTIMISTIC — THE VALIDATION FAILED.** The curve's CNN column
+is approximated: trained once on 28 classes with only the decision restricted
+to K columns. Wave 18 (`20239791`, 36/36 COMPLETED) retrained it per cohort on
+the SAME draws, evaluated on the SAME gated frames, both trained ungated — so
+the only difference is whether the network saw K classes or 28:
+
+| K | approximated | RETRAINED | gap |
+|---|---|---|---|
+| 7 | 47.66 % | **36.71 %** | **−10.95 pp** |
+| 14 | 33.15 % | **31.94 %** | −1.21 pp |
+| 21 | 28.09 % | **24.86 %** | −3.23 pp |
+
+Restricting a 28-class model's decision **overstates** what a K-class model
+achieves, by ~11 pp at K=7, and the gap narrows as K approaches 28 (where the
+two coincide by construction). The direction is sensible after the fact: a
+model trained on 28 identities sees ~4x the training frames of one trained on
+7, and the harder task regularises it.
+
+**Consequences, and they are not cosmetic:**
+
+- **The metric arm stands** — it is genuinely retrained per cohort.
+- **The CNN column must NOT be quoted as-is.** Either substitute wave 18's
+  retrained points (K = 7/14/21 only) or label the column explicitly as an
+  upper bound.
+- **The FUSION column inherits the optimism**, because it fuses the
+  approximated CNN posteriors. Its small-K values are overstated by an unknown
+  amount — smaller than the CNN's own gap, since the metric arm carries most
+  of the fusion, but not zero. Re-running fusion against the retrained
+  posteriors at K = 7/14/21 would bound it; not yet done.
+- The 60 pp draw-spread at K=4 and the monotone x-chance trend are unaffected:
+  both are dominated by the metric arm.
+
+**A real finding hides inside the failure.** Training on MORE identities than
+you enrol improves accuracy on the enrolled ones — the 28-class model beats the
+7-class model on the same 7 people. For paper 2 that is a closed-set statement
+about training data, not open-set re-ID, so it stays inside the boundary; but
+say it carefully, because the natural next step (train on a population, enrol a
+subset) is squarely paper 3's territory.
 
 **Axis 2 — a second corpus — is BLOCKED.** `$SCRATCH/datasets` holds only
 BIWI (`Training.rar`, `Testing.rar`). A second corpus needs a download and a
