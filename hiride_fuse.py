@@ -100,6 +100,51 @@ def cnn_cells(runs, policy, modality, arch, condition):
     return sorted(out, key=lambda t: int(t[0]["seed"]))
 
 
+def select_columns(full, cols, rows, subjects, p_med, max_drift, min_snr, names):
+    """Columns that are BOTH range-stable and discriminative, from train rows only.
+
+    Selecting on drift alone was not enough. `ht_300` has the second-lowest
+    drift of any column (0.10) and a between-subject SD of 26.7 against a
+    within-subject SD of 133.1 -- range-stable and nearly uninformative -- and
+    a drift-only filter keeps it. Meanwhile the crown-anchored widths are
+    informative but drift ~2.0, and adding them raised frame-level accuracy
+    while LOWERING every aggregated one: within a tracklet the subject's range
+    sweeps systematically, so a distance-driven error is correlated across the
+    whole window and integration cannot remove it.
+
+    So require both: drift across the training range small relative to the
+    identity signal, AND between-subject spread large relative to within.
+    Every quantity comes from training rows, so no test frame or label informs
+    the choice.
+    """
+    zt = p_med[rows] / 1000.0
+    span = float(np.diff(np.percentile(p_med[rows], [5, 95]))[0]) / 1000.0
+    kept, table = [], []
+    for j in cols:
+        yc, xc, mu, wsd = [], [], [], []
+        for u in sorted(set(subjects.tolist())):
+            m = subjects == u
+            if m.sum() < 20:
+                continue
+            y = full[rows][m, j].astype(np.float64)
+            if not np.isfinite(y).all():
+                continue
+            mu.append(y.mean()); wsd.append(y.std())
+            yc.append(y - y.mean()); xc.append(zt[m] - zt[m].mean())
+        if len(mu) < 5:
+            continue
+        Y, X = np.concatenate(yc), np.concatenate(xc)
+        vx = float((X * X).sum())
+        slope = float((X * Y).sum() / vx) if vx > 0 else 0.0
+        bsd, w = float(np.std(mu)), float(np.mean(wsd))
+        drift = abs(slope) * span / bsd if bsd > 1e-9 else np.inf
+        snr = bsd / w if w > 1e-9 else 0.0
+        table.append((names[j], drift, snr))
+        if drift < max_drift and snr > min_snr:
+            kept.append(j)
+    return kept, table
+
+
 def load_metric(prep, man, feature_set="metric"):
     """Metric features aligned to manifest rows, plus the eligibility mask.
 

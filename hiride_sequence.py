@@ -43,7 +43,7 @@ import numpy as np
 
 from hiride_data import load_manifest, make_split, eligible_mask
 from hiride_stats import cluster_boot, boot_rng
-from hiride_fuse import cnn_cells, load_metric
+from hiride_fuse import cnn_cells, load_metric, select_columns
 
 
 def agg_windows(F, rec, frame, w, stride):
@@ -106,6 +106,11 @@ def main():
                     choices=("metric", "shape", "metric+shape"),
                     help="metric+shape reaches 32.06 %% at R4 frame-level "
                          "against 28.06 %% for the pinned 12")
+    ap.add_argument("--invariance-max", type=float, default=None, metavar="R")
+    ap.add_argument("--min-snr", type=float, default=0.0, metavar="S",
+                    help="with --invariance-max, also require between-subject "
+                         "SD over within-subject SD above S. Drift alone keeps "
+                         "range-stable but uninformative columns.")
     ap.add_argument("--boot", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--full-body", action="store_true",
@@ -131,6 +136,10 @@ def main():
         gate = eligible_mask(zc["cues"], [str(f) for f in zc["feats"]],
                              full_body=True)
         print(f"[gate] full-body frames: {int(gate.sum())} of {len(gate)}")
+    zc2 = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
+    p_med_all = zc2["cues"][:, [str(f) for f in zc2["feats"]].index("p_med")].astype(float)
+    names_all = [str(n) for n in np.load(
+        os.path.join(args.prep, "metric_features.npz"), allow_pickle=False)["names"]]
     from sklearn.ensemble import RandomForestClassifier
 
     report = {}
@@ -165,10 +174,24 @@ def main():
                                   keep=(keep & gate) if gate is not None else keep)
             tr = tr[np.array([str(s) in cmap for s in man["subject"][tr]], bool)]
             ytr = np.array([cmap[str(s)] for s in man["subject"][tr]])
+            use = cols
+            if args.invariance_max is not None:
+                use, table = select_columns(
+                    full, cols, tr, np.asarray(man["subject"], str)[tr],
+                    p_med_all, args.invariance_max, args.min_snr, names_all)
+                if not use:
+                    print(f"  seed {seed}: selection kept 0 of {len(cols)} "
+                          f"columns -- loosen the thresholds"); continue
+                if seed == int(cells[0][0]["seed"]):
+                    top = sorted(table, key=lambda t: -t[2])[:8]
+                    print(f"  [select] kept {len(use)}/{len(cols)} "
+                          f"(drift<{args.invariance_max}, snr>{args.min_snr}); "
+                          f"best by snr: "
+                          + ", ".join(f"{n}({d:.2f}/{sn:.2f})" for n, d, sn in top))
             rf = RandomForestClassifier(n_estimators=300, random_state=seed, n_jobs=-1)
-            rf.fit(full[tr][:, cols], ytr)
+            rf.fit(full[tr][:, use], ytr)
             p_rf = np.zeros_like(p_cnn)
-            p_rf[:, rf.classes_.astype(int)] = rf.predict_proba(full[rows_s][:, cols])
+            p_rf[:, rf.classes_.astype(int)] = rf.predict_proba(full[rows_s][:, use])
             p_geo = np.exp(np.log(p_cnn + 1e-12) + np.log(p_rf + 1e-12))
             p_geo /= np.clip(p_geo.sum(1, keepdims=True), 1e-12, None)
 
@@ -191,7 +214,7 @@ def main():
                     if k == "cnn":
                         ndec[w].append(n)
                 # average the MEASUREMENT over the window, then classify
-                Xw, btr = agg_windows(full[tr][:, cols], tr_rec, tr_frame, w, 1)
+                Xw, btr = agg_windows(full[tr][:, use], tr_rec, tr_frame, w, 1)
                 yw = np.array([ytr[b[0]] for b in btr])
                 rfw = RandomForestClassifier(n_estimators=300, random_state=seed,
                                              n_jobs=-1)
@@ -199,7 +222,7 @@ def main():
                 # ONE set of test blocks, shared by both aggregations, so the
                 # feature-averaged and posterior-averaged columns are decided on
                 # exactly the same frames and are directly comparable
-                Xt, bte = agg_windows(full[rows_s][:, cols], rec, frame, w, max(w, 1))
+                Xt, bte = agg_windows(full[rows_s][:, use], rec, frame, w, max(w, 1))
                 yte = np.array([truth[b[0]] for b in bte])
                 pw = np.zeros((len(bte), p_cnn.shape[1]))
                 pw[:, rfw.classes_.astype(int)] = rfw.predict_proba(Xt)
