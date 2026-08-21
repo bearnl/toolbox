@@ -717,7 +717,14 @@ class ArrayBatches(tf.keras.utils.Sequence):
             xb = self._aug(xb)
         xb = xb if self.A is None else [xb, self.A[idx]]
         if self.y is None:
-            return xb
+            # A bare 2-element LIST is ambiguous with (x, y): Keras unpacks it
+            # as inputs-plus-targets, so a two-input model receives one input
+            # and the aux vector is silently treated as labels --
+            # `expects 2 input(s), but it received 1`. A 1-tuple says
+            # unambiguously "all of this is x". fit() is unaffected because
+            # ([image, aux], y) is already an unambiguous 2-tuple, which is why
+            # wave 17 trained for 60 epochs and then died in predict().
+            return (xb,) if self.A is not None else xb
         return xb, self.y[idx]
 
     def on_epoch_end(self):
