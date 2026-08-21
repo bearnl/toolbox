@@ -30,7 +30,7 @@ import argparse
 import numpy as np
 
 from hiride_data import load_manifest, make_split, block_train_counts, eligible_mask
-from hiride_metric import BASE_METRIC, SHAPE_PREFIXES, SKEL_PREFIXES
+from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
 
 LADDER = [("R0_frame_random", {}), ("R1_block", dict(guard=150)),
           ("R3_cross_recording", {}), ("R4_cross_session", {})]
@@ -142,8 +142,7 @@ def main():
         print(f"  {sname:<18s} {int((keep & m).sum()):>6d} / {int(m.sum()):>6d} kept "
               f"({100 * (keep & m).sum() / max(m.sum(), 1):5.1f} %)")
 
-    bone = [i for i, n in enumerate(names)
-            if n.startswith(SKEL_PREFIXES) and n != "sk_valid"]
+    bone = [i for i, n in enumerate(names) if n.startswith("bone_")]
     # `metric` is PINNED to the 12 published columns. Deriving it as
     # "everything that is not excluded" would have quietly redefined it the
     # moment head-anchored features were added to the npz, and every number in
@@ -160,13 +159,7 @@ def main():
         SETS["metric+shape"] = metric + shape
     if bone:
         SETS["skeleton"] = bone
-        # ratios only: dimensionless, so immune to the stature error that range
-        # clipping introduces, and to body size itself
-        rat = [i for i, n in enumerate(names) if n.startswith("sk_r_")]
-        if rat:
-            SETS["skel_ratios"] = rat
-        SETS["metric+skel"] = metric + bone
-        SETS["all"] = sorted(set(metric + shape + bone))
+        SETS["both"] = metric + bone
     SETS["metric+nuisance"] = metric + [i for i, n in enumerate(names)
                                         if n == "stand_dist_mm"]
     if shape:

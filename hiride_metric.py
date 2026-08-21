@@ -47,7 +47,6 @@ import os
 import json
 import argparse
 
-import glob
 import numpy as np
 
 from hiride_data import load_manifest, build_manifest
@@ -59,28 +58,15 @@ WIDTH_FRACS = (0.15, 0.30, 0.45, 0.60, 0.75, 0.90)
 _LOGGED = {"ground": False, "skel": False}
 
 
-def sibling(depth_rel, slot, kind, ext, root=None):
-    """`..._<frame>-b_<ts>_depth.pgm` -> the same frame's other file.
-
-    EACH BIWI STREAM CARRIES ITS OWN TIMESTAMP. Reusing the depth file's
-    timestamp names a file that usually does not exist, which is why skeletons
-    parsed on 168 of 28,037 frames while every frame ships one: the exact name
-    matched only where two streams happened to be stamped identically. When the
-    exact name misses, glob on the frame prefix instead and take the single hit.
-    """
+def sibling(depth_rel, slot, kind, ext):
+    """`..._<frame>-b_<ts>_depth.pgm` -> the same frame's other file."""
     base = os.path.basename(depth_rel)
     parts = base.split("_")
     if len(parts) < 4:
         return None
     parts[1] = parts[1].rsplit("-", 1)[0] + "-" + slot
     parts[-1] = f"{kind}.{ext}"
-    rel = os.path.join(os.path.dirname(depth_rel), "_".join(parts))
-    if root is None or os.path.exists(os.path.join(root, rel)):
-        return rel
-    parts[2] = "*"
-    hits = glob.glob(os.path.join(root, os.path.dirname(depth_rel),
-                                  "_".join(parts)))
-    return os.path.relpath(hits[0], root) if len(hits) == 1 else None
+    return os.path.join(os.path.dirname(depth_rel), "_".join(parts))
 
 
 def read_floats(path, limit=None):
@@ -114,104 +100,21 @@ def read_ground(path):
     return v[:4]
 
 
-# Microsoft Kinect SDK v1 20-joint skeleton. Confirmed against the parent
-# links in the files themselves: 0->1->2->3 hip-centre/spine/shoulder-centre/
-# head, 2->4..7 left arm, 2->8..11 right arm, 0->12..15 left leg,
-# 0->16..19 right leg -- and head Y +0.733 m against feet -0.968 m, a 1.70 m
-# stature, on the frame inspected.
-JOINT = dict(hip_c=0, spine=1, sho_c=2, head=3,
-             sho_l=4, elb_l=5, wri_l=6, hand_l=7,
-             sho_r=8, elb_r=9, wri_r=10, hand_r=11,
-             hip_l=12, knee_l=13, ank_l=14, foot_l=15,
-             hip_r=16, knee_r=17, ank_r=18, foot_r=19)
-SKEL_COLS = 14          # id, X, Y, Z, u, v, conf, ?, parent, joint, qx,qy,qz,qw
-
-
-SKEL_BONES = ((0, 1), (1, 2), (2, 3), (2, 4), (4, 5), (5, 6), (6, 7),
-              (2, 8), (8, 9), (9, 10), (10, 11),
-              (0, 12), (12, 13), (13, 14), (14, 15),
-              (0, 16), (16, 17), (17, 18), (18, 19))
-
-
-def skel_features(pts):
-    """Anthropometry from tracked joints: segment lengths in mm, plus RATIOS.
-
-    This is the geometry the whole campaign has been reaching for indirectly.
-    Limb proportion is the classic identity-bearing body measurement: it is
-    unaffected by clothing, and the ratios are unaffected by how tall someone
-    is, so they cannot be confounded by the stature error that range clipping
-    introduces (13.12). Nothing in the band features can express it, because a
-    silhouette cannot say where a knee is.
-
-    Symmetric segments are averaged left/right, which halves tracking noise and
-    removes any handedness. Every ratio is dimensionless. Absent joints yield
-    0.0 rather than NaN, and `sk_valid` says whether the frame had a skeleton
-    at all -- the keys are emitted unconditionally so the column set cannot
-    change between frames.
-    """
-    out = {}
-    if pts is None:
-        for a, b in SKEL_BONES:
-            out[f"sk_b{a:02d}{b:02d}"] = 0.0
-        for k in ("thigh", "shank", "upperarm", "forearm", "torso", "shoulder_w",
-                  "hip_w", "height", "leg", "arm"):
-            out[f"sk_{k}"] = 0.0
-        for k in ("leg", "torso", "arm", "shohip", "thighshank", "uafa"):
-            out[f"sk_r_{k}"] = 0.0
-        out["sk_valid"] = 0.0
-        return out
-    J = JOINT
-    d = lambda a, b: float(np.linalg.norm(pts[a] - pts[b]))
-    for a, b in SKEL_BONES:
-        out[f"sk_b{a:02d}{b:02d}"] = d(a, b)
-    sym = lambda l, r: 0.5 * (l + r)
-    thigh = sym(d(J["hip_l"], J["knee_l"]), d(J["hip_r"], J["knee_r"]))
-    shank = sym(d(J["knee_l"], J["ank_l"]), d(J["knee_r"], J["ank_r"]))
-    upper = sym(d(J["sho_l"], J["elb_l"]), d(J["sho_r"], J["elb_r"]))
-    fore = sym(d(J["elb_l"], J["wri_l"]), d(J["elb_r"], J["wri_r"]))
-    torso = d(J["hip_c"], J["spine"]) + d(J["spine"], J["sho_c"])
-    sho_w, hip_w = d(J["sho_l"], J["sho_r"]), d(J["hip_l"], J["hip_r"])
-    height = float(np.nanmax(pts[:, 1]) - np.nanmin(pts[:, 1]))
-    out.update(sk_thigh=thigh, sk_shank=shank, sk_upperarm=upper, sk_forearm=fore,
-               sk_torso=torso, sk_shoulder_w=sho_w, sk_hip_w=hip_w,
-               sk_height=height, sk_leg=thigh + shank, sk_arm=upper + fore)
-    r = lambda a, b: float(a / b) if b > 1e-6 and np.isfinite(a) else 0.0
-    out.update(sk_r_leg=r(thigh + shank, height), sk_r_torso=r(torso, height),
-               sk_r_arm=r(upper + fore, height), sk_r_shohip=r(sho_w, hip_w),
-               sk_r_thighshank=r(thigh, shank), sk_r_uafa=r(upper, fore))
-    out = {k: (v if np.isfinite(v) else 0.0) for k, v in out.items()}
-    out["sk_valid"] = 1.0
-    return out
-
-
 def read_skel(path):
-    """-> (20, 3) joint positions in MILLIMETRES, NaN where a joint is absent.
-
-    The file is 14 columns per joint: a leading constant, XYZ in metres, the
-    2D projection, a confidence, a spare, then PARENT and JOINT indices, then a
-    quaternion. The previous parser tried strides 3/4/9/12 and took the first
-    that divided the float count -- 20 joints x 14 columns is 280 floats, which
-    4 divides, so it silently returned 70 bogus "joints" from misaligned
-    columns whenever it ran at all.
-    """
     v, txt = read_floats(path)
     if not _LOGGED["skel"]:
         _LOGGED["skel"] = True
         print(f"[format] skel first file: {os.path.basename(path)}\n"
-              f"         raw head: {(txt or '')[:200]!r}\n"
+              f"         raw head: {(txt or '')[:300]!r}\n"
               f"         parsed {0 if v is None else len(v)} floats")
-    if v is None or len(v) < SKEL_COLS or len(v) % SKEL_COLS:
+    if v is None or len(v) < 9:
         return None
-    rows = v.reshape(-1, SKEL_COLS)
-    idx = np.rint(rows[:, 9]).astype(int)
-    ok = (idx >= 0) & (idx < 20) & np.isfinite(rows[:, 1:4]).all(1)
-    if ok.sum() < 12:                       # too little of the body tracked
-        return None
-    pts = np.full((20, 3), np.nan, dtype=np.float64)
-    pts[idx[ok]] = rows[ok][:, 1:4] * 1000.0            # metres -> mm
-    if np.nanmax(np.abs(pts)) > 1e5:
-        return None
-    return pts
+    for stride in (3, 4, 9, 12):                 # xyz / xyz+conf / +rotation
+        if len(v) % stride == 0 and len(v) // stride >= 3:
+            pts = v.reshape(-1, stride)[:, :3]
+            if np.isfinite(pts).all() and np.abs(pts).max() < 1e5:
+                return pts
+    return None
 
 
 # The 12 columns the published numbers were computed from (19.04 % at R4,
@@ -222,7 +125,6 @@ BASE_METRIC = ("depth_extent_mm", "height_p05", "height_p50", "stature_mm",
                "surface_area_m2", "volume_proxy_l",
                "w_15", "w_30", "w_45", "w_60", "w_75", "w_90")
 SHAPE_PREFIXES = ("hw_", "ht_", "hc_", "ha_", "r_")
-SKEL_PREFIXES = ("sk_",)
 NUISANCE = ("stand_dist_mm", "ground", "n_points", "valid_frac",
             "top_clip", "bot_clip")
 
@@ -359,20 +261,28 @@ def main():
             user, _ = read_pgm(os.path.join(raw["root"], raw["user"][i]))
         except Exception:
             continue
-        g = sibling(raw["depth"][i], "e", "groundCoeff", "txt", root=raw["root"])
+        g = sibling(raw["depth"][i], "e", "groundCoeff", "txt")
         ground = read_ground(os.path.join(raw["root"], g)) if g else None
         f = frame_features(depth, user, ground)
         if f is None:
             continue
         n_ground += int(f.get("ground", 0) > 0)
 
-        s = sibling(raw["depth"][i], "d", "skel", "txt", root=raw["root"])
+        s = sibling(raw["depth"][i], "d", "skel", "txt")
         pts = read_skel(os.path.join(raw["root"], s)) if s else None
-        n_skel += int(pts is not None)
-        # emitted unconditionally, so a frame without a skeleton contributes
-        # zeros and sk_valid=0 rather than a different column set -- `names` is
-        # fixed from the first kept frame and a varying key set corrupts it
-        f.update(skel_features(pts))
+        if pts is not None and len(pts) >= 4:
+            n_skel += 1
+            k_j = min(len(pts), 15)
+            d = []
+            nm = []
+            for a in range(k_j):
+                for b in range(a + 1, k_j):
+                    d.append(float(np.linalg.norm(pts[a] - pts[b])))
+                    nm.append(f"bone_{a:02d}_{b:02d}")
+            if bone_names is None:
+                bone_names = nm
+            if len(d) == len(bone_names):
+                f.update(dict(zip(bone_names, d)))
 
         if names is None:
             names = sorted(f)
