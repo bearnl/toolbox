@@ -81,6 +81,18 @@ def main():
                          "got easier'. Training on cues and testing on "
                          "full_body isolates the second; --eligibility "
                          "full_body then adds the first on top of it.")
+    ap.add_argument("--invariance-max", type=float, default=None,
+                    metavar="R",
+                    help="add an `invariant` feature set: keep only columns "
+                         "whose drift across the TRAINING range, divided by "
+                         "their between-subject SD, is below R. Selection uses "
+                         "training rows only -- no test frame, and no test "
+                         "label, informs which columns survive. This is the "
+                         "honest form of automatic feature selection here: "
+                         "picking features by cross-session accuracy on 28 "
+                         "subjects would be fitting the test set, whereas "
+                         "range-invariance is a physics argument that can be "
+                         "made before anyone looks at who is who. Try 0.5.")
     ap.add_argument("--detrend", action="store_true",
                     help="remove one global fixed-effects slope per feature "
                          "against standing distance, fitted on TRAIN rows only "
@@ -198,6 +210,44 @@ def main():
                   f"features ({len(set(ytr.tolist()))} classes) -- need >=50 test")
             continue
         maj = float(np.bincount(yte).max() / len(yte))
+        if args.invariance_max is not None:
+            # Fixed-effects drift per candidate column, fitted on TRAIN rows.
+            cand = sorted(set(metric) | set(shape))
+            zt = p_med[tr] / 1000.0
+            span = float(np.diff(np.percentile(p_med[tr], [5, 95]))[0]) / 1000.0
+            subs = man["subject"][tr]
+            kept, rej = [], []
+            for j in cand:
+                yc, xc, mu = [], [], []
+                for u in sorted(set(subs.tolist())):
+                    sm = subs == u
+                    if sm.sum() < 20:
+                        continue
+                    yy = full[tr][sm, j].astype(np.float64)
+                    if not np.isfinite(yy).all():
+                        continue
+                    mu.append(yy.mean())
+                    yc.append(yy - yy.mean()); xc.append(zt[sm] - zt[sm].mean())
+                if len(mu) < 5:
+                    continue
+                Y, X = np.concatenate(yc), np.concatenate(xc)
+                vx = float((X * X).sum())
+                slope = float((X * Y).sum() / vx) if vx > 0 else 0.0
+                bsd = float(np.std(mu))
+                ratio = abs(slope) * span / bsd if bsd > 1e-9 else np.inf
+                (kept if ratio < args.invariance_max else rej).append((names[j], ratio, j))
+            if kept:
+                SETS["invariant"] = [j for _, _, j in kept]
+                print(f"{pol:<20s} invariant<{args.invariance_max}: kept "
+                      f"{len(kept)}/{len(cand)} -- "
+                      + ", ".join(f"{n}({r:.2f})" for n, r, _ in sorted(kept,
+                                                                       key=lambda t: t[1])[:8])
+                      + (" ..." if len(kept) > 8 else ""))
+            else:
+                print(f"{pol:<20s} invariant<{args.invariance_max}: NOTHING kept "
+                      f"of {len(cand)} candidates")
+                SETS.pop("invariant", None)
+
         Xall = full
         if args.detrend:
             # One slope per feature, fitted on TRAIN rows with each subject
