@@ -56,7 +56,7 @@ import numpy as np
 
 from hiride_data import load_manifest, make_split, eligible_mask
 from hiride_keys import cond_key, arch_key
-from hiride_metric import BASE_METRIC
+from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
 from hiride_stats import cluster_boot, boot_rng
 
 
@@ -100,7 +100,7 @@ def cnn_cells(runs, policy, modality, arch, condition):
     return sorted(out, key=lambda t: int(t[0]["seed"]))
 
 
-def load_metric(prep, man):
+def load_metric(prep, man, feature_set="metric"):
     """Metric features aligned to manifest rows, plus the eligibility mask.
 
     Returns (full, have, cols, keep): `full` is (n_manifest_rows, n_features)
@@ -117,11 +117,27 @@ def load_metric(prep, man):
     full = np.full((len(man["frame"]), F.shape[1]), np.nan, dtype=np.float32)
     full[rows] = F
     have = ~np.isnan(full[:, 0])
-    # pinned to the 12 published columns -- see hiride_metric.BASE_METRIC
-    cols = [i for i, n in enumerate(names) if n in BASE_METRIC]
+    # `metric` stays pinned to the 12 published columns (hiride_metric.
+    # BASE_METRIC) so 18.83 % and 19.04 % keep reproducing; the crown-anchored
+    # block is opt-in, because metric+shape reaches 32.06 % at R4 against
+    # 28.06 % for the 12 alone and silently switching would strand every
+    # earlier number.
+    if feature_set == "metric":
+        cols = [i for i, n in enumerate(names) if n in BASE_METRIC]
+    elif feature_set == "shape":
+        cols = [i for i, n in enumerate(names) if n.startswith(SHAPE_PREFIXES)]
+    elif feature_set == "metric+shape":
+        cols = [i for i, n in enumerate(names)
+                if n in BASE_METRIC or n.startswith(SHAPE_PREFIXES)]
+    else:
+        raise SystemExit(f"unknown feature set {feature_set!r}")
+    if not cols:
+        raise SystemExit(
+            f"feature set {feature_set!r} selected 0 of {len(names)} columns -- "
+            f"has hiride_metric.py been re-run since the shape block was added?")
     print(f"[load] {int(have.sum())} frames with metric features, "
           f"{int((keep_cue & have).sum())} also cue-eligible; "
-          f"using {len(cols)} metric columns")
+          f"using {len(cols)} columns ({feature_set})")
     return full, have, cols, keep_cue & have
 
 
@@ -134,6 +150,8 @@ def main():
     ap.add_argument("--arch", default="alexnet")
     ap.add_argument("--condition", action="append", default=None,
                     help="repeatable; defaults to the three best R4 depth conditions")
+    ap.add_argument("--features", default="metric",
+                    choices=("metric", "shape", "metric+shape"))
     ap.add_argument("--boot", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default=None)
@@ -141,7 +159,7 @@ def main():
     conditions = args.condition or ["sil_scaled", "scale_removed", "person_centred"]
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
-    full, have, cols, keep = load_metric(args.prep, man)
+    full, have, cols, keep = load_metric(args.prep, man, args.features)
 
     from sklearn.ensemble import RandomForestClassifier
     report = {}
