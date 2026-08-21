@@ -255,6 +255,70 @@ text; the earlier `[UNVERIFIED]` tag is lifted). What each actually says, and ho
 
 ---
 
+### Venue: paper 2 is a JOURNAL paper (author, 2026-08-21)
+
+Papers 1 and 3 are conference papers; paper 2 is the journal one. That is a
+structural constraint, not a length one, and it changes what has to be in it.
+
+**A conference paper carries one sharp result. A journal paper has to be a
+complete treatment** — methodology, comprehensive evaluation, negative results,
+limitations, and enough detail to reproduce. This campaign is unusually well
+suited to that, because most of what it produced is exactly the material a
+conference paper would have to cut.
+
+**The four contributions, all clear of paper 1 and paper 3:**
+
+- **C1 — Protocol.** A leak-free evaluation ladder for closed-set depth person
+  identification, and a quantification of what each rung removes: rgb
+  99.99 -> 5.59 %, depth 98.36 -> 6.70 % across R0 -> R4. The methodological
+  point generalises past this dataset: random hold-out is valid for independent
+  samples and video frames are not independent.
+- **C2 — Attribution.** The mechanism suite: what the accuracy is *of*. At R3
+  the background with the person inpainted out (38.57 %) BEATS the full frame
+  (34.82 %) while the person alone scores 8.65 %. The within-session number is
+  the room.
+- **C3 — Measurement validity.** The sensor-geometry work of §13.12–§13.14:
+  74 % of walking frames hold a clipped body; `stature_mm` drifts 89.5 mm per
+  metre of range against a 105 mm between-subject SD; features anchored on a
+  clipped body are placed on the wrong anatomy. And the operating point that
+  follows — 19.04 % raw, 28.06 % on valid frames, ~43 % with 2.5 s of
+  integration.
+- **C4 — Modality.** RGB's advantage is clothing and is protocol-dependent:
+  53.0 pp at R3, 5.3 pp at R4, converging to ~0.5 pp with the corrected head.
+
+Plus a **negative-results section** that a conference paper could not afford:
+gait is untestable on BIWI and why (§13.8); de-trending features against range
+costs 24 pp at R1 (§13.12); score-level fusion does not realise a proven
+complementarity (§13.10); the CNN is indifferent to depth precision — 4 bits
+equals 16 (§8.4) — which is itself the cleanest evidence that it reads outline,
+not 3D shape.
+
+**THE JOURNAL-SPECIFIC RISK IS EXTERNAL VALIDITY.** Every headline number comes
+from one 28-subject corpus. A conference reviewer accepts that; a journal
+reviewer asks whether it generalises. Three honest responses, in order of
+preference:
+
+1. Add a second public depth corpus with multi-session subjects, run the ladder
+   only (not the full suite), and show the R0-to-R4 collapse reproduces. This
+   is the strongest answer and the only one that fully closes the objection.
+2. Report the in-house corpus (wave 8, §12.6) as a limited second site — it has
+   no userMap and no recording-disjoint rung, so it can support R0/R1 only, and
+   the room-vs-identity confound must be stated. Weak but honest.
+3. Frame BIWI explicitly as a case study and argue C1 generalises by
+   construction, since the independence violation is a property of video, not of
+   this dataset. Defensible for C1, NOT for C3's operating point.
+
+Decide this before drafting: it determines whether §13.12's ~43 % is presented
+as *the* operating point or as *this corpus's* operating point.
+
+**Positioning.** Cite paper 1 for tracked-joint anthropometry and paper 3 for
+the FOV-clipping diagnosis and multi-frame fusion; claim neither. Paper 2's
+distinctive setting is the one both leave open: **closed-set identification
+from the depth image and its shipped user map, with no joint tracking and no
+open-set machinery.** The CNN's failure to recover geometry that tracked joints
+make explicit is a paper-2 result that *depends* on paper 1 existing, and is
+the cleanest way to cite it without borrowing from it.
+
 ## 4. Experiment design
 
 ### 4.1 The protocol ladder — the decision that drives everything
