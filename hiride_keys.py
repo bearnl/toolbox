@@ -20,7 +20,7 @@ here in the same commit.
 # "default, omit from the key". Anything not listed here is metadata.
 AXES = dict(bits=16, frames=1, encoding="raw", head="gap", augment=0, test_fuse=1,
             erode=2, depth_slab_mm=6000.0, init=None, eligibility="cues",
-            ref_eligibility="match")
+            ref_eligibility="match", aux="none")
 
 
 def arch_key(r):
@@ -37,6 +37,9 @@ def arch_key(r):
     # changes how many training frames each recording contributes at R1
     if r.get("ref_eligibility", "match") != "match":
         arch += f"/ref{r['ref_eligibility']}"
+    # an auxiliary input changes the MODEL, so it belongs on the arch side
+    if r.get("aux", "none") != "none":
+        arch += f"/aux{r['aux']}"
     return arch
 
 

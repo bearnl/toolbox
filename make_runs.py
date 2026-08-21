@@ -340,10 +340,40 @@ WAVE16 = dict(
 )
 
 
+# Wave 17 -- DOES THE CNN FAIL FOR WANT OF METRIC SCALE?
+#
+# What survives a session change is millimetres. Turning pixel extent into
+# millimetres needs the subject's standing distance, and the network is never
+# given it -- convolution and pooling are built to be invariant to precisely
+# that. Hand-computed metric features reach 28.86 % at R4 where this CNN
+# reaches 18.40 % on the same frames, from arithmetic and no training data.
+#
+# THE PREDICTION THAT MAKES THIS A TEST. --aux dist should help the conditions
+# that PRESERVE apparent size (person, person_centred) and do almost nothing
+# for sil_scaled and scale_removed, which normalise size away by construction
+# and so have no metric content left for distance to unlock. A uniform lift
+# across all four would refute the story: it would mean distance is acting as a
+# recording-identity shortcut, not as the missing calibration term.
+#
+# Paired by construction: every cell appears with and without --aux, on an
+# identical frame set (p_med comes from cues.npz, which every eligible frame
+# has), so the contrast is not confounded by which frames were scored.
+WAVE17 = dict(
+    policies=[("R4_cross_session", ""), ("R3_cross_recording", "")],
+    conditions=[
+        ("person", "size preserved -- aux SHOULD help"),
+        ("person_centred", "size preserved -- aux SHOULD help"),
+        ("scale_removed", "size normalised away -- aux should NOT help"),
+        ("sil_scaled", "size normalised away -- aux should NOT help"),
+    ],
+    seeds=[0, 1, 2],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -427,6 +457,15 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 17:
+        for policy, extra in WAVE17["policies"]:
+            for cond, _why in WAVE17["conditions"]:
+                for seed in WAVE17["seeds"]:
+                    for aux in ("none", "dist"):
+                        lines.append(
+                            f"--policy {policy} --modality depth --arch alexnet "
+                            f"--condition {cond} --seed {seed} --aux {aux} "
+                            f"{extra}".strip())
     elif args.wave == 16:
         for policy, extra in WAVE16["policies"]:
             for cond, mod, flags, seeds in WAVE16["cells"]:

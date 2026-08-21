@@ -90,7 +90,36 @@ def spatial_head(x, n_classes, head):
     raise ValueError(head)
 
 
-def build_alexnet(input_shape, n_classes, head="gap"):
+def attach_aux(L, inp, x, aux_dim):
+    """Concatenate an auxiliary scalar vector to the pooled image features.
+
+    WHY THIS EXISTS. What survives a session change is METRIC: millimetres of
+    stature, width, thickness. Recovering millimetres from a depth image means
+    multiplying pixel extent by the depth value and dividing by the focal
+    length -- a multiplicative interaction between spatial extent and pixel
+    intensity. Convolution and pooling are engineered to be INVARIANT to
+    exactly that, and the network is never given the focal length or the
+    subject's standing distance. Hand-computed metric features reach 28.86 % at
+    R4 where this CNN reaches 18.40 % on identical frames, using arithmetic and
+    no training data at all.
+
+    So hand the network the term it cannot compute and see whether it uses it.
+    The prediction that makes this a test rather than a tweak: distance should
+    HELP the conditions that preserve apparent size (`person`,
+    `person_centred`) and do almost NOTHING for `sil_scaled`, which normalises
+    size away by construction and therefore has no metric content left for
+    distance to unlock. If it lifts everything equally, the story is wrong and
+    distance is acting as a recording-identity shortcut instead.
+    """
+    if not aux_dim:
+        return inp, x
+    aux = L.Input(shape=(aux_dim,), name="aux", dtype="float32")
+    a = L.Dense(32, activation="relu")(aux)
+    a = L.Dropout(0.2)(a)
+    return [inp, aux], L.Concatenate()([x, a])
+
+
+def build_alexnet(input_shape, n_classes, head="gap", aux_dim=0):
     """The 2023 architecture with its two structural defects repaired.
 
     2023 did Conv(activation='relu') -> BatchNorm -> Activation('relu'), i.e.
@@ -121,11 +150,12 @@ def build_alexnet(input_shape, n_classes, head="gap"):
     # incoherent -- the channel change is 23,232 of 58,524,466 params (0.0397%).
     x = spatial_head(x, n_classes, head)
     x = L.Dropout(0.5)(x)
+    inputs, x = attach_aux(L, inp, x, aux_dim)
     out = L.Dense(n_classes, activation="softmax", dtype="float32")(x)
-    return tf.keras.Model(inp, out, name=f"alexnet_{head}")
+    return tf.keras.Model(inputs, out, name=f"alexnet_{head}")
 
 
-def build_convnext(input_shape, n_classes, pretrained=True, head="gap"):
+def build_convnext(input_shape, n_classes, pretrained=True, head="gap", aux_dim=0):
     """ConvNeXt-Tiny with an honest 1-channel stem when the input is depth.
 
     ImageNet weights are a FIXED CONTROL here, applied to both modalities.
@@ -186,8 +216,9 @@ def build_convnext(input_shape, n_classes, pretrained=True, head="gap"):
                                           name="imagenet_norm_from_pm1")(x)
     x = spatial_head(base(x), n_classes, head)
     x = tf.keras.layers.Dropout(0.3)(x)
+    inputs, x = attach_aux(tf.keras.layers, inp, x, aux_dim)
     out = tf.keras.layers.Dense(n_classes, activation="softmax", dtype="float32")(x)
-    return tf.keras.Model(inp, out, name="convnext_tiny")
+    return tf.keras.Model(inputs, out, name="convnext_tiny")
 
 
 # Every axis that makes two runs a DIFFERENT cell. `tag` must encode all of
@@ -196,7 +227,8 @@ def build_convnext(input_shape, n_classes, pretrained=True, head="gap"):
 # loudly instead of silently costing seeds.
 CELL_FIELDS = ("policy", "modality", "arch", "init", "condition", "seed", "guard",
                "permuted", "bits", "depth_slab_mm", "frames", "encoding", "erode",
-               "head", "eligibility", "ref_eligibility", "augment", "test_fuse")
+               "head", "eligibility", "ref_eligibility", "augment", "test_fuse",
+               "aux")
 
 
 def run_tag(m):
@@ -227,7 +259,8 @@ def run_tag(m):
             + (f"_e{m['erode']}" if m.get("erode", 2) != 2 else "")
             + (f"_g{g}" if m["policy"].startswith("R1") and g not in (None, 150) else "")
             + (f"_ref{m['ref_eligibility']}"
-               if m.get("ref_eligibility", "match") != "match" else ""))
+               if m.get("ref_eligibility", "match") != "match" else "")
+            + (f"_aux{m['aux']}" if m.get("aux", "none") != "none" else ""))
 
 
 def scale_remove(img, mask, fill, is_depth, target_h=SCALE_TARGET_H,
@@ -632,8 +665,11 @@ class ArrayBatches(tf.keras.utils.Sequence):
     """
 
     def __init__(self, X, y=None, batch_size=32, shuffle=False, seed=0,
-                 augment=0, fill=-1.0):
+                 augment=0, fill=-1.0, A=None):
         self.X, self.y, self.bs, self.shuffle = X, y, int(batch_size), shuffle
+        # aux rows are indexed with the SAME permutation as X, so shuffling
+        # cannot silently pair a frame with another frame's scalars
+        self.A = A
         # augment = max translation in px. Random shift + horizontal flip, applied
         # ONLY to training batches. This targets the nuisance the mechanism suite
         # identified as decisive -- framing -- by making the network invariant to
@@ -671,6 +707,7 @@ class ArrayBatches(tf.keras.utils.Sequence):
         xb = self.X[idx]
         if self.augment:
             xb = self._aug(xb)
+        xb = xb if self.A is None else [xb, self.A[idx]]
         if self.y is None:
             return xb
         return xb, self.y[idx]
@@ -749,6 +786,14 @@ def main():
                     help="'normals' replaces depth with 3-channel unit surface normals: "
                          "scale-free, so immune to the contrast problem, but noise "
                          "amplifying -- pair with --frames.")
+    ap.add_argument("--aux", choices=("none", "dist"), default="none",
+                    help="`dist` appends the subject's standing distance "
+                         "(cues p_med, z-scored on TRAIN rows) to the pooled "
+                         "image features. It is the one quantity needed to "
+                         "turn pixel extent into millimetres, and the network "
+                         "is otherwise never given it. Uses cues.npz, so the "
+                         "frame set is UNCHANGED and these cells compare "
+                         "directly against their --aux none partners.")
     ap.add_argument("--erode", type=int, default=2,
                     help="pixels to erode the mask by for interior_only; also drops the "
                          "rim contaminated by prep's AREA resize.")
@@ -868,9 +913,23 @@ def main():
     print(f"[data] loaded in {time.time() - t0:.0f}s  train={Xtr.shape} "
           f"val={Xva.shape} test={Xte.shape}  classes={len(classes)}")
 
+    Atr = Ava = Ate = None
+    aux_dim = 0
+    if args.aux == "dist":
+        cz = np.load(os.path.join(args.prep, "cues.npz"), allow_pickle=False)
+        pm = cz["cues"][:, [str(f) for f in cz["feats"]].index("p_med")].astype(np.float32)
+        # standardised on TRAIN rows only -- test statistics must not leak into
+        # the input scaling
+        mu, sd = float(pm[tr].mean()), float(pm[tr].std()) or 1.0
+        Atr, Ava, Ate = ((pm[i] - mu).reshape(-1, 1) / sd for i in (tr, va, te))
+        aux_dim = 1
+        print(f"[aux] standing distance, train mean {mu:.0f} mm sd {sd:.0f} mm")
+
     shape = Xtr.shape[1:]
-    model = (build_alexnet(shape, len(classes), args.head) if args.arch == "alexnet"
+    model = (build_alexnet(shape, len(classes), args.head, aux_dim=aux_dim)
+             if args.arch == "alexnet"
              else build_convnext(shape, len(classes), pretrained=(args.init == "imagenet"),
+                                 aux_dim=aux_dim,
                                  head=args.head))
     # Optimiser parity: identical settings for every architecture. 2023 gave
     # ViT clipvalue=0.1 and AlexNet none, confounding the architecture contrast.
@@ -880,9 +939,10 @@ def main():
     # Batch-wise feeding (see ArrayBatches). Do NOT pass batch_size/shuffle to
     # fit()/predict() here: the Sequence owns both.
     train_seq = ArrayBatches(Xtr, y[tr], args.batch_size, shuffle=True, seed=args.seed,
+                             A=Atr,
                              augment=args.augment)
-    val_seq = ArrayBatches(Xva, y[va], args.batch_size)
-    test_seq = ArrayBatches(Xte, None, args.batch_size)
+    val_seq = ArrayBatches(Xva, y[va], args.batch_size, A=Ava)
+    test_seq = ArrayBatches(Xte, None, args.batch_size, A=Ate)
     es = tf.keras.callbacks.EarlyStopping(
         # 2023 monitored val_loss with restore_best_weights=False, so the
         # reported number was whatever the model scored 10 epochs AFTER it
@@ -963,6 +1023,7 @@ def main():
         depth_clip_mm=DEPTH_CLIP_MM, bits=args.bits, depth_slab_mm=args.depth_slab_mm,
         frames=args.frames, encoding=args.depth_encoding, erode=args.erode, head=args.head,
         eligibility=args.eligibility, ref_eligibility=args.ref_eligibility,
+        aux=args.aux,
         augment=args.augment, **fused,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),
