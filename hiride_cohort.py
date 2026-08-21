@@ -70,7 +70,8 @@ def main():
     from sklearn.ensemble import RandomForestClassifier
 
     hdr = (f"{'K':>4s}{'chance':>9s}{'draws':>7s}{'cnn frame':>11s}{'metric frame':>14s}"
-           f"{'cnn @W':>9s}{'metric @W':>12s}{'geo @W':>9s}{'spread @W':>11s}")
+           f"{'cnn @W':>9s}{'metric @W':>12s}{'geo @W':>9s}{'x chance':>10s}"
+           f"{'spread @W':>11s}")
     print(f"\n{args.policy}  {args.modality}  {args.arch}  {args.condition}"
           f"{'  [full-body gated]' if args.full_body else ''}"
           f"   W={args.window} frames/decision\n")
@@ -100,14 +101,22 @@ def main():
                     continue
                 # SAME draw rule as hiride_train.py --cohort-seed, so the CPU
                 # curve and wave 18's retrained points use identical cohorts
-                pick = np.random.default_rng([d, K]).choice(
-                    np.array(common), size=K, replace=False)
+                # SORTED, and sorted immediately. The CNN arm indexes columns
+                # through `cidx` (draw order) and the metric arm through
+                # `cmapK` (sorted order); fusing them multiplied two different
+                # orderings together, which put geo BELOW both of its own
+                # inputs -- 37.43 % against cnn 62.76 % and metric 88.20 % at
+                # K=4. Sorting here fixes every downstream index at once.
+                # hiride_train.py uses this draw as a SET membership test, so
+                # ordering does not change which subjects it picks.
+                pick = np.sort(np.random.default_rng([d, K]).choice(
+                    np.array(common), size=K, replace=False))
                 cidx = np.array([classes.index(p) for p in pick if p in classes])
                 if len(cidx) < K:
                     continue
                 keepK = keep & np.isin(subj_all, pick)
                 trK, _, _ = make_split(man, args.policy, seed=seed, keep=keepK)
-                cmapK = {c: i for i, c in enumerate(sorted(pick.tolist()))}
+                cmapK = {c: i for i, c in enumerate(pick.tolist())}
                 trK = trK[np.array([s in cmapK for s in subj_all[trK]], bool)]
                 if len(trK) < 40:
                     continue
@@ -117,8 +126,8 @@ def main():
                 rs, tt = rows_s[mrow], truth[mrow]
                 # CNN: restrict the decision to the enrolled columns only
                 sub = prob[mrow][:, cidx]
-                gold = np.array([list(cidx).index(classes.index(s))
-                                 for s in subj_all[rs]])
+                # cidx now follows sorted(pick), so this is cmapK's order too
+                gold = np.array([cmapK[s] for s in subj_all[rs]])
                 accs["cnn_f"].append(float((sub.argmax(1) == gold).mean()))
                 # metric: genuinely retrained on the K enrolled subjects
                 rf = RandomForestClassifier(n_estimators=300, random_state=seed,
@@ -127,9 +136,11 @@ def main():
                        np.array([cmapK[s] for s in subj_all[trK]]))
                 pm = np.zeros((len(rs), K))
                 pm[:, rf.classes_.astype(int)] = rf.predict_proba(full[rs][:, cols])
-                goldK = np.array([cmapK[s] for s in subj_all[rs]])
+                goldK = gold
                 accs["met_f"].append(float((pm.argmax(1) == goldK).mean()))
                 # and the same, one decision per W frames within a recording
+                assert list(cidx) == [classes.index(p) for p in pick], \
+                    "cnn columns must follow sorted(pick) -- see the geo bug"
                 sn = sub / np.clip(sub.sum(1, keepdims=True), 1e-12, None)
                 pg = np.exp(np.log(sn + 1e-12) + np.log(pm + 1e-12))
                 rec = np.array([f"{a}|{b}" for a, b in
@@ -155,7 +166,8 @@ def main():
         spread = 100 * (max(per["geo_w"]) - min(per["geo_w"])) if per["geo_w"] else 0
         print(f"{K:>4d}{100/K:>8.2f}%{len(per['met_w']):>7d}{m['cnn_f']:>10.2f}%"
               f"{m['met_f']:>13.2f}%{m['cnn_w']:>8.2f}%{m['met_w']:>11.2f}%"
-              f"{m['geo_w']:>8.2f}%{spread:>10.1f}pp")
+              f"{m['geo_w']:>8.2f}%{m['geo_w'] * K / 100:>9.1f}x"
+              f"{spread:>10.1f}pp")
         report[str(K)] = dict(mean=m, spread_geo_w=spread,
                               draws={k: v for k, v in per.items()})
 
