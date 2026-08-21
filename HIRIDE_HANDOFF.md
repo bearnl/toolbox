@@ -1783,8 +1783,30 @@ for subjects who barely move):
 | `w_15` | 49.9 mm | **−0.9 mm/m** | ~0 |
 | `w_30` | 38.5 mm | **−4.5 mm/m** | ~0 |
 
-**Which features drift names the mechanism.** Widths need no vertical extent and
-do not drift at all. Every HEIGHT-derived feature does, because at close range
+**TEN OF THE TWELVE FEATURES DRIFT MORE ACROSS THE WALK THAN THEY VARY BETWEEN
+PEOPLE.** Ranked by `drift/sig` = |slope| x 2.2 m (the span of
+`Testing/Walking`) / between-subject SD — below ~0.5 is usable, above 1 means
+the range moves it further than people differ:
+
+| feature | drift/sig | | feature | drift/sig |
+|---|---|---|---|---|
+| `w_15` | **0.04** | | `volume_proxy_l` | 1.78 |
+| `w_30` | **0.25** | | `stature_mm` | 1.87 |
+| `w_90` | 0.93 | | `height_p05` | 1.92 |
+| `w_45` | 1.26 | | `w_60` | 2.07 |
+| `depth_extent_mm` | 1.54 | | `height_p50` | 2.11 |
+| `surface_area_m2` | 1.55 | | `w_75` | **2.34** |
+
+The ordering explains itself. With bands anchored at the bottom of the visible
+body and scaled by stature, a band's position error is `stature_error x f`, and
+the resulting width error is that times the width GRADIENT at that height. So
+`w_75` (shoulders, where width changes fastest with height) is worst at 2.34;
+`w_15`/`w_30` sit next to the anchor and barely move; `w_90` is at the neck
+where width changes slowly, so it drifts less than the bands below it despite a
+larger position error. This is a positional artefact, not a sensor limit.
+
+**Which features drift names the mechanism.** Widths near the anchor need no
+vertical extent and do not drift at all. Every HEIGHT-derived feature does, because at close range
 the vertical FOV clips the body and a clipped body is a shorter body. This is
 the frame-truncation confound `hiride_range_profile.py` was built to test,
 appearing as a bias inside the features rather than as a probe-accuracy effect.
