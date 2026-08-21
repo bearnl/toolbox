@@ -717,19 +717,31 @@ class ArrayBatches(tf.keras.utils.Sequence):
             xb = self._aug(xb)
         xb = xb if self.A is None else [xb, self.A[idx]]
         if self.y is None:
-            # A bare 2-element LIST is ambiguous with (x, y): Keras unpacks it
-            # as inputs-plus-targets, so a two-input model receives one input
-            # and the aux vector is silently treated as labels --
-            # `expects 2 input(s), but it received 1`. A 1-tuple says
-            # unambiguously "all of this is x". fit() is unaffected because
-            # ([image, aux], y) is already an unambiguous 2-tuple, which is why
-            # wave 17 trained for 60 epochs and then died in predict().
-            return (xb,) if self.A is not None else xb
+            return xb                     # plain x; see predict_seq() below
         return xb, self.y[idx]
 
     def on_epoch_end(self):
         if self.shuffle:
             self.rng.shuffle(self.order)
+
+
+def predict_seq(model, seq):
+    """Batch-wise predict that does NOT depend on how Keras unpacks a Sequence.
+
+    `model.predict(sequence)` has to guess whether a returned container is
+    `x`, `(x, y)`, or `(x, y, w)`. For a two-input model `__getitem__` must
+    yield `[image, aux]`, which is indistinguishable from `(x, y)` -- Keras
+    took the image as x and the aux vector as targets, so the model received
+    one input and raised `expects 2 input(s), but it received 1`. Wave 17
+    trained for 60 epochs before dying there, twice, and a 1-tuple did not fix
+    it either.
+
+    `predict_on_batch` takes x directly, with nothing to unpack. Order is the
+    identity because the Sequence is built with shuffle=False, which is what
+    lines predictions up against the truth vector.
+    """
+    return np.concatenate([np.asarray(model.predict_on_batch(seq[i]))
+                           for i in range(len(seq))], axis=0)
 
 
 class TestCurve(tf.keras.callbacks.Callback):
@@ -749,7 +761,7 @@ class TestCurve(tf.keras.callbacks.Callback):
         self.seq, self.truth, self.accs = seq, truth, []
 
     def on_epoch_end(self, epoch, logs=None):
-        prob = self.model.predict(self.seq, verbose=0)
+        prob = predict_seq(self.model, self.seq)
         acc = float((np.argmax(prob, axis=1) == self.truth).mean())
         self.accs.append(acc)
         if logs is not None:
@@ -982,7 +994,7 @@ def main():
         model.set_weights(es.best_weights)
     hit_epoch_cap = es.stopped_epoch == 0 and len(hist.history["loss"]) >= args.epochs
 
-    prob = model.predict(test_seq, verbose=0)
+    prob = predict_seq(model, test_seq)
     assert prob.shape[0] == len(te), (prob.shape, len(te))
     pred = np.argmax(prob, axis=1)
     truth = y[te]
