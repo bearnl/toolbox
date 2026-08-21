@@ -454,16 +454,26 @@ def fig_operating_point(paths, out):
                     markerfacecolor=colour if pi == 0 else "none",
                     label=f"{arm}  {'gated' if gated else 'all frames'}")
         if pi == 0:
+            ticks, labels = [], []
             for w, x in zip(W, xs):
                 n = rec["n_decisions"][str(w)]
-                ax.annotate(f"n={int(n)}", (x, 2.0), fontsize=6.5, rotation=90,
-                            ha="center", va="bottom", color="#888888")
+                ticks.append(x)
+                labels.append(("all" if w == 0 else str(w)) + f"\nn={int(n)}")
+            # Explicit ticks at the windows actually measured. A log2 axis
+            # labelled 2^0..2^8 cannot tell a reader which point is 25 frames,
+            # and the decision count belongs ON the axis: the rightmost columns
+            # rest on 28 decisions and must not be read like the leftmost, which
+            # rests on 2,933.
+            ax.set_xticks(ticks)
+            ax.set_xticklabels(labels, fontsize=7.5)
+            ax.tick_params(axis="x", which="minor", bottom=False)
     if not drawn:
         print("  (fig7 skipped: no sequence json)")
         plt.close(fig)
         return
     ax.set_xscale("log", base=2)
-    ax.set_xlabel("frames per decision  (rightmost point = whole tracklet)")
+    ax.set_xlabel("frames per decision, and the number of decisions behind it",
+                  labelpad=2)
     ax.set_ylabel("frame / window accuracy (%)")
     ax.set_title("Identity accumulates with observation, once invalid frames are refused",
                  fontsize=10.5)
@@ -471,8 +481,10 @@ def fig_operating_point(paths, out):
                label="majority-class rate (gated)")
     ax.legend(frameon=False, fontsize=7.5, ncol=2, loc="upper left")
     ax.spines[["top", "right"]].set_visible(False)
-    fig.text(0.5, -0.02, "n = decisions behind each point; the whole-tracklet column is one "
-                         "decision per subject", ha="center", fontsize=8, color="#555555")
+    fig.text(0.5, -0.04, "solid = frames with a complete body only (the sensor's own user "
+                         "map); dashed = every frame\n\"all\" = one decision per subject, "
+                         "28 of them -- read its interval, not its point estimate",
+             ha="center", fontsize=8, color="#555555")
     save(fig, out, "fig7_operating_point")
 
 
