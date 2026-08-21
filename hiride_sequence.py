@@ -111,6 +111,12 @@ def main():
                     help="with --invariance-max, also require between-subject "
                          "SD over within-subject SD above S. Drift alone keeps "
                          "range-stable but uninformative columns.")
+    ap.add_argument("--ci-window", type=int, default=25,
+                    help="window at which to compute the subject-cluster "
+                         "interval. Default 25 frames (~2.5 s at 10 fps), "
+                         "which is where the curve flattens AND still rests on "
+                         "~100 decisions -- whole-tracklet has 28 and an "
+                         "interval too wide to quote.")
     ap.add_argument("--boot", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--full-body", action="store_true",
@@ -233,14 +239,19 @@ def main():
                 pc = np.stack([np.log(p_cnn[b] + 1e-12).mean(0) for b in bte])
                 acc["geo_agg"][w].append(
                     float(((pc + np.log(pw + 1e-12)).argmax(1) == yte).mean()))
-            # per-tracklet correctness, for a subject-clustered interval
+            # per-DECISION correctness at the reporting window, for a
+            # subject-clustered interval. Clustering is by subject, not by
+            # window, because several windows from one recording are not
+            # independent observations of anything.
             for k, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
                 cor, sub = [], []
                 for r in np.unique(rec):
                     m = np.flatnonzero(rec == r)
-                    p = np.log(P[m] + 1e-12).mean(0)
-                    cor.append(float(p.argmax() == truth[m[0]]))
-                    sub.append(r.split("|")[1])
+                    m = m[np.argsort(frame[m])]
+                    for blk in windows(m, args.ci_window):
+                        p = np.log(P[blk] + 1e-12).mean(0)
+                        cor.append(float(p.argmax() == truth[blk[0]]))
+                        sub.append(r.split("|")[1])
                 tail[k].append((np.array(cor), np.array(sub)))
 
         hdr = (f"{'frames/decision':>16s}{'decisions':>11s}{'cnn':>9s}"
@@ -253,20 +264,24 @@ def main():
                             for k in ("cnn", "metric", "geo"))
                   + "".join(f"{100 * np.mean(acc[k][w]):>9.2f}%"
                             for k in ("met_agg", "geo_agg")))
-        print("  whole-tracklet subject-cluster CI (mean over seeds):")
+        lab = ("whole tracklet" if args.ci_window <= 0
+               else f"{args.ci_window} frames/decision")
+        print(f"  subject-cluster CI at {lab} (mean over seeds, "
+              f"{int(np.mean(ndec[args.ci_window])) if args.ci_window in ndec else '?'} "
+              f"decisions):")
         cis = {}
         for k in ("cnn", "metric", "geo"):
-            per = [cluster_boot(c, s, boot_rng(args.seed, ("seq", cond, k, i)), args.boot)
+            per = [cluster_boot(c, s, boot_rng(args.seed, ("seq", cond, k, args.ci_window, i)), args.boot)
                    for i, (c, s) in enumerate(tail[k])]
             cis[k] = [float(np.mean([p[0] for p in per])),
                       float(np.mean([p[1] for p in per]))]
-            print(f"    {k:<8s}{100 * np.mean(acc[k][0]):>7.2f}%  "
+            print(f"    {k:<8s}{100 * np.mean(acc[k].get(args.ci_window, acc[k][0])):>7.2f}%  "
                   f"[{100 * cis[k][0]:+.1f}, {100 * cis[k][1]:+.1f}]")
         report[cond] = dict(windows=W,
                             acc={k: {str(w): float(np.mean(v)) for w, v in d.items()}
                                  for k, d in acc.items()},
                             n_decisions={str(w): float(np.mean(v)) for w, v in ndec.items()},
-                            tracklet_ci=cis)
+                            ci_window=args.ci_window, ci=cis)
 
     if args.out:
         # settings travel WITH the numbers: a curve read months later must say
