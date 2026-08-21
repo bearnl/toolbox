@@ -427,7 +427,7 @@ def fig_operating_point(paths, out):
     import json as _json
     fig, ax = plt.subplots(figsize=(7.6, 4.8))
     ARMS = (("cnn", "#7f7f7f"), ("metric", DEPTH_C), ("geo", "#9467bd"))
-    drawn = False
+    drawn, ticks, labels = False, [], []
     for pi, path in enumerate(paths):
         try:
             blob = _json.load(open(path))
@@ -454,24 +454,24 @@ def fig_operating_point(paths, out):
                     markerfacecolor=colour if pi == 0 else "none",
                     label=f"{arm}  {'gated' if gated else 'all frames'}")
         if pi == 0:
-            ticks, labels = [], []
-            for w, x in zip(W, xs):
-                n = rec["n_decisions"][str(w)]
-                ticks.append(x)
-                labels.append(("all" if w == 0 else str(w)) + f"\nn={int(n)}")
-            # Explicit ticks at the windows actually measured. A log2 axis
-            # labelled 2^0..2^8 cannot tell a reader which point is 25 frames,
-            # and the decision count belongs ON the axis: the rightmost columns
-            # rest on 28 decisions and must not be read like the leftmost, which
-            # rests on 2,933.
-            ax.set_xticks(ticks)
-            ax.set_xticklabels(labels, fontsize=7.5)
-            ax.tick_params(axis="x", which="minor", bottom=False)
+            ticks = list(xs)
+            labels = [("all" if w == 0 else str(w))
+                      + f"\nn={int(rec['n_decisions'][str(w)])}" for w in W]
     if not drawn:
         print("  (fig7 skipped: no sequence json)")
         plt.close(fig)
         return
     ax.set_xscale("log", base=2)
+    # AFTER set_xscale, which installs a log locator and would otherwise
+    # discard these. Explicit ticks at the windows actually measured: an axis
+    # labelled 2^0..2^8 cannot tell a reader which point is the 25-frame
+    # operating point the paper quotes. The decision count belongs on the axis
+    # too -- the curve rises toward its noisiest end, so the eye lands on the
+    # whole-tracklet column exactly where there are 28 decisions, not 2,933.
+    if ticks:
+        ax.set_xticks(ticks)
+        ax.set_xticklabels(labels, fontsize=7.5)
+        ax.tick_params(axis="x", which="minor", bottom=False)
     ax.set_xlabel("frames per decision, and the number of decisions behind it",
                   labelpad=2)
     ax.set_ylabel("frame / window accuracy (%)")
