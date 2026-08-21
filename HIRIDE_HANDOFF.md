@@ -1872,6 +1872,58 @@ posteriors also fails, badly and worse with window length (18.83 → 5.37 % at 1
 frames), because a test window spans standing distances a training window never
 does — posterior averaging survives that since each frame still votes separately.
 
+### 13.13 Feature work: what it bought, and where 28 subjects stop resolving
+
+**Crown-anchored shape features** (35 columns: eight bands below the crown x
+width/thickness/circumference/aspect, plus three ratios). Frame-level at R4 on
+full-body frames: `metric` 28.06 %, `shape` 18.70 %, **`metric+shape` 32.06 %**;
+at R3, 21.91 % -> **33.62 %**. So they add real information, but only in
+combination — `shape` alone is worse than the 12 it was meant to replace.
+
+**The gain inverts under aggregation.** Against `metric` alone: 25-frame
+windows 43.30 -> 42.33, whole tracklet 50.71 -> 48.57. Within a tracklet the
+subject's range sweeps systematically, so a distance-driven error is correlated
+across the whole window and integration cannot remove it. **Frame-level accuracy
+is the wrong objective when the deployment integrates** — a drifting feature is
+worse than useless there, however much it helps one frame.
+
+**Thickness is the one real physical find.** `ht_300` has the second-lowest
+drift of all 47 columns (0.10) and every `ht_*` lands between 0.10 and 0.91,
+while crown-anchored WIDTHS beyond 200 mm still drift ~2.0. Thickness varies
+slowly with height, so it survives band misplacement; width does not. (Drift
+rising with band offset also says the residual defect is a SCALE error in the
+height axis, not the offset error crown-anchoring fixed — probably the ground
+plane. Third distinct defect; same tool would diagnose it.)
+
+**LABEL-FREE DRIFT SELECTION CANNOT WORK ON THIS DATASET.** `select_columns`
+estimates drift from training rows and reports `stature_mm` at **0.02**; the
+pooled diagnostic measures **1.87** for the same column. Not a bug —
+`Training` spans 2187–3565 mm, and the drift is produced by frame clipping
+below ~2200 mm, which `Training` barely contains. The bias is out-of-
+distribution by construction, so no criterion fitted on the training pool can
+detect it. The full-body gate works precisely because it is a per-frame
+VALIDITY check rather than anything learned.
+
+**DO NOT QUOTE THE THRESHOLD SWEEP.** Four (drift, snr) pairs were tried and
+the best read 46.02 % at 25 frames and 57.86 % whole-tracklet. That is the
+maximum of four attempts scored on the test set — the exact failure the
+criterion was meant to prevent.
+
+**And nothing in the sweep is resolvable anyway.** At 25 frames there are 103
+decisions, so the binomial SE near 45 % is **4.9 pp**; whole-tracklet has 28
+decisions and SE **9.4 pp**. Every selection variant (43.11–46.02) sits inside
+one SE of plain `metric` (43.30). **The aggregated operating point cannot
+distinguish any of this feature work.** The frame-level gain (28.86 -> 31.41 on
+2,933 frames) is the only part with enough decisions to be worth a claim, and
+it needs a subject-clustered interval before it gets one.
+
+**Where this leaves the feature question.** What survives is the gate and the
+observation budget — both measurement discipline, neither a feature. Better
+features are plausibly worth a few points frame-level and demonstrably nothing
+after integration. Settling it needs more SUBJECTS, not more columns: n = 28 is
+the binding constraint here exactly as it has been for every other claim in this
+campaign.
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
