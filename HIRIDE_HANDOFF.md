@@ -1996,6 +1996,80 @@ measured anywhere in this campaign, because they need joint landmarks that
 neither the silhouette nor these features provide. If BIWI ships `*_skel.txt`,
 this is the single largest gap in the feature set.
 
+### 13.15 METHODOLOGY: what the userMap does to every masked number
+
+Author's challenge, 2026-08-21: *depth is cheated by using the human map while
+colour was not; extracting the human is done with a ground-truth map.* Half
+right, and the half that is wrong matters more than the half that is right.
+
+**The mask is applied to BOTH modalities.** Every rgb mechanism row uses the
+same shipped `userMap` — `person` 14.46 %, `scale_removed` 17.72 % at R4. RGB
+is not handicapped relative to depth anywhere in the suite.
+
+**But the mask is DERIVED FROM DEPTH**, by the OpenNI/NITE user tracker running
+on the depth stream. So the assistance is not symmetric:
+
+- a DEPTH system obtains that mask from its own sensor at runtime, so
+  masked-depth rows describe a deployable depth-only system;
+- an RGB-ONLY system cannot obtain it at all. Masked-rgb rows therefore
+  describe an RGB-**D** system, not an RGB camera.
+
+**The oracle step advantages RGB, not depth.** `rgb scale_removed` 17.72 % at
+R4 is not an RGB-camera result. Depth's 12.45 % is the closer of the two to
+honest. This must be stated, because a reader will otherwise reach for exactly
+the opposite conclusion, as the author did.
+
+**Call it what it is: not ground truth.** §0 currently says "the dataset's
+shipped ground-truth masks". The userMap is sensor-stack OUTPUT, not human
+annotation — which is what makes it available at deployment for a depth system.
+CONFIRM AGAINST THE BIWI DOCUMENTATION BEFORE PUBLISHING, because the whole
+deployability argument above turns on it.
+
+**And it is not free even for depth.** §12.5: naive depth segmentation (1500 mm
+slab + largest connected component) reaches recall 0.976 but precision 0.204,
+covering 39 % of the frame. The shipped map is the SDK's learned body-part
+classifier, so every masked number is bounded by "given segmentation at least
+this good".
+
+**HOW TO FRAME IT IN THE PAPER.** Two clearly separated classes of result:
+
+1. **Systems results — no oracle input.** The full-frame ladder. R4 depth
+   6.70 %, rgb 5.59 %. This is what a camera of each kind achieves.
+2. **Mechanism results — given the sensor's own user segmentation.** The whole
+   condition suite, the metric features, the trivial-cue floor, the full-body
+   gate (`bot_clip` comes from the mask), and therefore the ~43 % headline of
+   §13.12. These answer "what information is present and what does the model
+   use", NOT "what would a deployed system achieve".
+
+Every table in class 2 needs one caption sentence: *"person segmentation is
+taken from the sensor's shipped user map; for depth this is available at
+runtime, for RGB it is not, so the RGB rows describe an RGB-D system."* §0's
+existing sentence about the trivial-cue floor already says this for one table
+— extend it to all of them rather than leaving it as a footnote on the floor.
+
+**The experiment that would close the gap**, if a reviewer presses: run the rgb
+mechanism conditions with an RGB-DERIVED segmentation (a pretrained person
+segmenter, or GrabCut) and report the difference. That converts a caveat into a
+measurement. Not run; scoped and honest to omit with the caveat stated.
+
+### 13.16 Skeletons exist but do not track — 168 of 28,037 frames
+
+`Training.rar` holds 23,904 `_skel.txt` files and `Testing.rar` 15,377 — one per
+frame, 39,281 total. But `hiride_metric.py` reports **skeleton parsed on
+168/28037 frames, 105 segment lengths**. 105 = C(15,2), so where it works it
+recovers all 15 NITE joints; it simply almost never works.
+
+The likely cause is the data, not the parser: NITE skeleton tracking needs a
+calibration pose and fails for seated subjects, which is what BIWI's head-pose
+protocol records. VERIFY by dumping a failing file against the one that parsed
+(`000a_000009-d_111627673_skel.txt`) before touching `read_skel`.
+
+If the files are genuinely empty, limb proportions — the scale-free,
+clothing-invariant geometry most likely to survive a session change — are
+unavailable on this dataset, and that belongs in Limitations beside the gait
+finding (§13.8) as a second concrete requirement for the paper-3 corpus:
+**skeleton tracking that holds through the recording.**
+
 ### 13.11 Open items
 
 1. **Wave 16b (`20165081`) must land before any `interior_only` or erode number
