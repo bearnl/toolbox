@@ -2504,6 +2504,21 @@ record for the paper's data-availability statement: BIWI RGBD-ID's own
 official source is equally dead** — our copy cannot currently be re-downloaded
 publicly.
 
+**Nearline inventory, checked 2026-08-31 — no rescue there either.** The author
+swept `~/nearline/def-czarnuch/chenzz/rawdata/` for candidates:
+`ntu_rgbd/` is an EMPTY directory (created 2024-04-14 — an aborted/never-run
+download; if a ROSE Lab agreement from that attempt still exists, NTU RGB+D
+masked depth remains the strongest later addition for a true cross-day rung);
+`HOWS/` is HOWS-CL-25, a household-OBJECTS continual-learning set, unrelated;
+`leo-data/` (236 MB) is a two-set raw Kinect v2 per-stream export of the
+in-house identity `leo` — color/depth/time for both sets plus `bodyIndex` (the
+sensor user map) and `body` (skeletons) for set 1 only. So a sensor user map
+DID exist for at least one in-house capture, but at a single identity it
+cannot support any ladder rung, and the in-house corpus stays mask-less and
+R0/R1-only as documented in §11.1. `rgbd_people_unihall` is the mensa-family
+RGB-D People data, already excluded (§2.11: annotation tracks, not verified
+identities). Everything else in rawdata was already inventoried in §7.
+
 **The corpus that is actually obtainable — and now in wave 21 — is TVRID**
 (ICPR 2026 top-view RGB-D re-ID competition data; Zenodo
 DOI 10.5281/zenodo.20070280, CC-BY-4.0, open, no registration; ~15 GiB
