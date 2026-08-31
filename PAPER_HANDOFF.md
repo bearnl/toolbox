@@ -8,6 +8,51 @@
 
 ---
 
+## ⚠ CORRECTION 2026-08-31 — read before drafting anything (synced from paper 2)
+
+Paper 2's re-run audited this document's FOV-clipping claim with the dataset's own
+shipped person masks and **refuted it by measurement** (`hiride_fov_check.py`,
+HIRIDE_HANDOFF §12.5; run `--paper3-exact` to reproduce). Three consequences for this
+paper, in decreasing severity:
+
+1. **The §4.8 diagnosis is unsupported.** "100 % of Training frames clip the body; 0 of
+   13,426 full-body" is a property of `anthro_probe.py`'s foreground (1500 mm slab +
+   largest-connected-component), not of the frames. Replicated exactly — same frames,
+   same edge rule — that foreground reports 99.95 / 99.98 % top/bottom clipping, while
+   the shipped userMap reports **3.25 / 13.23 % with 85.5 % of bodies fully in frame**.
+   The LCC merges the person (recall 0.976) with the floor and rear wall (precision
+   0.204, 39 % of the frame), so the blob touches both edges by construction. The
+   "height std 16 mm across 28 people" and "Training↔Testing height correlation −0.04"
+   rows are what measuring the ROOM looks like, not evidence of FOV saturation.
+   **"Cross-session failure = BIWI capture artifact" must not be claimed on this
+   evidence.** The honest statement paper 2's data supports: cross-session transfer
+   fails for every representation tested there too, and the scene itself moved between
+   sessions (background +620 mm for all 28 shared subjects) — day, clothes and camera
+   pose change together on BIWI, and no analysis has yet separated them.
+2. **The §4.7 anthropometry heights are non-anatomical and need re-derivation.** The
+   audit's own numbers say so: mean "height" 2012–2160 mm with A-session std 16 mm.
+   Standing adults measured from the userMap-based unprojection in paper 2
+   (`hiride_metric.py`) give stature median 1744 mm, p5–p95 1520–1897 — plausible.
+   Re-derive §4.7 with a corrected foreground (the shipped userMap is free and exact)
+   before quoting any millimetre value; the 79 % R1 conclusion may survive, but its
+   inputs currently do not.
+3. **The TRAINING path needs its own check before any number is quoted.** The
+   `preprocess_depth_smart` slab (600 mm from the 1st-percentile anchor, no LCC) has
+   **IoU 0.000 and precision 0.000 with the person** on 4,000 audited raw Training
+   frames — the anchor sits at 1975 ± 20 mm (a static scene element) while the nearest
+   person surface is at 2810 mm. If that holds inside `siamese.py`'s own loader (which
+   crops and resizes differently — VERIFY THERE, this is not yet established), the
+   models were trained on a background band and the within-session R1 may be the same
+   recording-fingerprint effect paper 2 documents as `bg_plate` (97 % at R1 with the
+   person absent). The cheap verification: dump 20 preprocessed training crops from
+   `siamese.py` itself and overlay the userMap.
+
+Sections §0, §2, §4.7–§4.8, §5, §7 and §8 below carry inline correction notes at the
+affected claims. Original text is kept ~~struck through~~ as the record of what was
+believed and why.
+
+---
+
 ## 0. One-paragraph summary
 
 We study whether **depth images can serve as a drop-in alternative to RGB in a single,
@@ -22,9 +67,12 @@ parity under constant clothing. The single largest lever is a **depth-specific
 dynamic-range preprocessing** (foreground-slab width 600→300 mm, +13 pp), which has no RGB
 analog. We show depth Re-ID is **viable from scratch** (40% R1, ~11× random) and that a
 training-free **metric-anthropometry analysis** reaches up to **79% R1** within session,
-confirming the identity signal is genuine body geometry. We **diagnose** the cross-session
+confirming the identity signal is genuine body geometry. ~~We **diagnose** the cross-session
 (cross-clothing) collapse as a **BIWI capture artifact** (100% of Training frames clip the
-body at the field-of-view edge), not a limitation of the depth modality.
+body at the field-of-view edge), not a limitation of the depth modality.~~ **[CORRECTED
+2026-08-31: the clipping figure measured the audit foreground, not the frames — 85.5 % of
+Training bodies are fully in frame per the shipped userMap. See the correction block at
+the top; the collapse is real but its cause is undiagnosed here.]**
 
 ---
 
@@ -78,8 +126,13 @@ R5 is near-saturated, random R5 = 17.9%). **Random R1 = 1/28 = 3.6%.**
 1. Only 28 test IDs → R5 near-meaningless; we report R1 + mAP, use multi-frame seq-probe.
 2. Within-test is same-clothing → favours RGB's constant clothing cue; we built the
    cross-clothing eval to test the regime that should favour depth.
-3. **Training frames clip 100% of bodies at the FOV edge** → cross-session metric transfer
-   impossible (diagnosed in 4.8); this is the dataset's fundamental limitation for us.
+3. ~~**Training frames clip 100% of bodies at the FOV edge** → cross-session metric transfer
+   impossible (diagnosed in 4.8); this is the dataset's fundamental limitation for us.~~
+   **[CORRECTED 2026-08-31: userMap-measured clipping is 3.6 % top / 13.1 % bottom /
+   85.4 % full-body (Training, eligible frames). The real, measured framing fact from
+   paper 2: only 25.6 % of Testing/Walking frames hold a whole body, and the close-range
+   bins are the clipped ones — a train/test covariate shift, not a blanket Training
+   defect.]**
 
 ---
 
@@ -242,7 +295,12 @@ mm via Kinect intrinsics — **no skeleton, no CNN**), prototype NN matching.
 strong clothing-independent identity; **thickness + height** (the cues a 2-D silhouette
 cannot capture) are the carriers (highest between/within-subject variance ratios).
 Including FOV-clipped frames drops this to 33% frame R1 — clipping halves the signal even
-within session.
+within session. **[CORRECTION NOTE 2026-08-31: these features came from the slab+LCC
+foreground whose "heights" run 2.0–2.2 m — the room's vertical extent, not stature (see
+top block, item 2). The within-session ranking signal may be real (paper 2's
+userMap-based metric features reach 67.97 % on 50-way R1-analogue within session), but
+re-derive this table from a corrected foreground before publishing any of its numbers,
+and note the "full-body frames" subset was selected by the same broken audit.]**
 
 ### 4.8 Cross-session collapse — a dataset artifact, not a modality limit
 
@@ -254,16 +312,28 @@ within session.
 | CNN RGB (clip 300) | 10.2 ± 4.1 | 61.0 ± 1.5 |
 | Hand-crafted anthropometry | ~1.4 | ~12 |
 
-All collapse toward random (3.6%). **Height audit** (28 subjects, `--full-body-only`):
-- **100% of Training frames clip the body at top AND bottom edge**; **0 of 13,426 are
-  full-body.** Measured "height" std across 28 distinct people = **16 mm** (FOV-saturated).
-- Same-person height correlation Training↔Testing: **Pearson −0.04, Spearman −0.15** —
-  measurements do not transfer across sessions.
+All collapse toward random (3.6%). ~~**Height audit** (28 subjects, `--full-body-only`):~~
+**[SUPERSEDED 2026-08-31 — the audit measured its own foreground, not the frames; kept as
+record. See the correction block at the top.]**
+- ~~**100% of Training frames clip the body at top AND bottom edge**; **0 of 13,426 are
+  full-body.** Measured "height" std across 28 distinct people = **16 mm** (FOV-saturated).~~
+  → userMap on the same frames, same edge rule: 3.25 % top / 13.23 % bottom / **85.5 %
+  full-body**. The 16 mm std and the ~2 m "heights" are the room's vertical extent.
+- ~~Same-person height correlation Training↔Testing: **Pearson −0.04, Spearman −0.15** —
+  measurements do not transfer across sessions.~~ → a null correlation between two room
+  measurements; says nothing about stature transfer. (Paper 2's userMap-based stature has
+  drift/sig 1.87 against standing distance — height DOES transfer poorly, but for a
+  measured, different reason: frame truncation at close range plus band misplacement.)
 - Azimuth (viewpoint) canonicalization does **not** recover it (camera ≈ canonical, both
-  ~random), ruling out viewpoint angle as the cause.
-- **Conclusion**: cross-session failure = BIWI's tight Training framing (FOV clipping), not
-  depth. Prior depth-only work reaches 30–60% cross-clothing on BIWI, so the modality can do
-  it; the standard BIWI Training capture precludes consistent metric measurement *for us*.
+  ~random) — still true as run, but both arms used the same foreground.
+- ~~**Conclusion**: cross-session failure = BIWI's tight Training framing (FOV clipping), not
+  depth.~~ **[WITHDRAWN. What remains established here: the collapse itself (5.3 / 10.2 %
+  R1), which paper 2 independently reproduces for every background-carrying representation.
+  The cause is NOT yet attributed in this paper's own data; candidate causes measured in
+  paper 2: the scene moved between sessions (+620 mm background for all 28 subjects), and
+  height-derived features drift with standing distance. If a diagnosis section is kept, it
+  must be re-derived from a corrected foreground — the shipped userMap is free and exact.]**
+  Prior depth-only work reaches 30–60% cross-clothing on BIWI, so the modality can do it.
 
 ---
 
@@ -277,8 +347,12 @@ All collapse toward random (3.6%). **Height audit** (28 subjects, `--full-body-o
    Karianakis's "depth needs RGB transfer" premise; we show preprocessing, not transfer,
    carries most of the gain.
 4. **Training-free proof that body geometry is the signal** (up to 79% R1) (4.7).
-5. **Diagnosis that the cross-session ceiling is a dataset capture artifact** (FOV clipping),
-   not a modality limit (4.8) — an honest, useful negative result.
+5. ~~**Diagnosis that the cross-session ceiling is a dataset capture artifact** (FOV clipping),
+   not a modality limit (4.8) — an honest, useful negative result.~~ **[WITHDRAWN
+   2026-08-31 — see the correction block. Candidate replacement contribution: the honest
+   negative result that cross-session transfer fails for CNN, RGB and hand-crafted
+   geometry alike, with the cause left open (or attributed via paper 2's measured
+   session confounds, with citation).]**
 
 ---
 
@@ -320,18 +394,26 @@ requires matching their protocol (Wu has public code: github.com/wuancong/depth_
 - We **do not beat SOTA**: depth-only SOTA is 30–60% (Wu, Hafner); skeleton/fusion 91–98%.
   Our same-session ~48% is on an easier protocol; cross-clothing ~5% is below depth-only SOTA
   (blamed on the diagnosed FOV clipping).
-- **Defensible contributions** (modest, honest): (a) the dynamic-range preprocessing finding;
+- **Defensible contributions** (modest, honest): (a) the dynamic-range preprocessing finding
+  **[but see top-block item 3: verify inside the trainer that the slab actually selects the
+  person before claiming the mechanism — paper 2's audit of the bare 600 mm slab on raw
+  frames found IoU 0.000 with the body, and its own slab-rescale sweep at fixed foreground
+  was FLAT, suggesting the clip-300 gain was foreground SELECTION, not contrast]**;
   (b) clean architecture×init ablation showing from-scratch viability; (c) training-free
-  anthropometry analysis attributing the signal to body geometry; (d) the FOV-clipping
-  dataset diagnosis. **Best framed as a focused empirical study / short paper**, or a journal
-  extension of HI-RIDE (classification vs open-set metric learning + preprocessing analysis),
-  **not** a SOTA claim.
+  anthropometry analysis attributing the signal to body geometry **[re-derive first — see
+  §4.7 note]**; ~~(d) the FOV-clipping dataset diagnosis~~ **[withdrawn]**. **Best framed as
+  a focused empirical study / short paper**, or a journal extension of HI-RIDE
+  (classification vs open-set metric learning + preprocessing analysis), **not** a SOTA claim.
 
 ---
 
 ## 8. Limitations (for the limitations section)
 - Single dataset (BIWI); 28 test IDs (R5 saturated; R1 the meaningful metric).
-- Cross-session/cross-clothing not demonstrable here (BIWI Training FOV-clips 100% of bodies).
+- ~~Cross-session/cross-clothing not demonstrable here (BIWI Training FOV-clips 100% of
+  bodies).~~ **[CORRECTED 2026-08-31: state instead that cross-session performance
+  collapsed for every method tried and the cause was not isolated; BIWI's two sessions
+  differ in day, clothing AND camera/scene pose simultaneously (paper 2's census), so the
+  dataset cannot attribute the failure among them.]**
 - From-scratch large-backbone overfits early on ~10 k frames; depends on early stopping.
 - Same-clothing within-session protocol structurally favours RGB; depth's clothing-invariance
   advantage is untestable on this dataset.
@@ -367,6 +449,15 @@ requires matching their protocol (Wu has public code: github.com/wuancong/depth_
    otherwise present prior work as context with explicit protocol caveats, not as beaten baselines.
 4. **Venue framing**: empirical-study / short-paper, or HI-RIDE journal extension — *not* a
    SOTA paper.
+5. **[ADDED 2026-08-31] Foreground verification, BLOCKING.** Before any drafting: (a) dump
+   ~20 preprocessed training crops from `siamese.py`'s own loader and overlay the shipped
+   userMap — establishes whether the trained models saw the person or a background band
+   (top-block item 3); (b) re-derive §4.7 and any retained §4.8 analysis with a
+   userMap-based foreground (`hiride_fov_check.py` / `hiride_metric.py` in this repo show
+   how); (c) delete or re-measure every millimetre value currently in the draft material.
+   Paper 2 cites paper 3's clip-300 finding and its multi-frame fusion — coordinate wording
+   so the two papers describe BIWI's framing identically (paper 2's measured numbers:
+   85.4 % of Training bodies full-body; 25.6 % of Testing/Walking).
 
 ---
 

@@ -71,7 +71,7 @@ def main():
 
     hdr = (f"{'K':>4s}{'chance':>9s}{'draws':>7s}{'cnn frame':>11s}{'metric frame':>14s}"
            f"{'cnn @W':>9s}{'metric @W':>12s}{'geo @W':>9s}{'x chance':>10s}"
-           f"{'spread @W':>11s}{'cnn retrain':>13s}")
+           f"{'spread @W':>11s}{'cnn retrain':>13s}{'geo retrain @W':>16s}")
     print(f"\n{args.policy}  {args.modality}  {args.arch}  {args.condition}"
           f"{'  [full-body gated]' if args.full_body else ''}"
           f"   W={args.window} frames/decision\n")
@@ -81,7 +81,8 @@ def main():
                             full_body=bool(args.full_body), window=args.window,
                             cohorts=Ks, draws=args.draws)}
     for K in Ks:
-        per = {k: [] for k in ("cnn_f", "met_f", "cnn_w", "met_w", "geo_w", "cnn_rt")}
+        per = {k: [] for k in ("cnn_f", "met_f", "cnn_w", "met_w", "geo_w", "cnn_rt",
+                               "geo_rt_w")}
         for d in range(args.draws):
             accs = {k: [] for k in per}
             for meta, cm_path in cells:
@@ -133,6 +134,7 @@ def main():
                 # Evaluated on the same gated frames as the approximation, and
                 # both were TRAINED ungated, so the only difference is whether
                 # the network saw K classes or 28.
+                rt_cells = []
                 for _rm, rpath in cnn_cells(args.runs, args.policy, args.modality,
                                             args.arch, f"{args.condition}/k{K}d{d}"):
                     rz = np.load(rpath, allow_pickle=False)
@@ -142,6 +144,7 @@ def main():
                         continue
                     accs["cnn_rt"].append(
                         float((rz["pred"][rsel] == rz["truth"][rsel]).mean()))
+                    rt_cells.append((rz, rsel))
                 # metric: genuinely retrained on the K enrolled subjects
                 rf = RandomForestClassifier(n_estimators=300, random_state=seed,
                                             n_jobs=-1)
@@ -159,16 +162,44 @@ def main():
                 rec = np.array([f"{a}|{b}" for a, b in
                                 zip(np.asarray(man["seq"], str)[rs], subj_all[rs])])
                 frame = np.asarray(man["frame"])[rs].astype(np.int64)
-                for name, P, g in (("cnn_w", sn, gold), ("met_w", pm, goldK),
-                                   ("geo_w", pg, goldK)):
+                def win_acc(P, g, rec_a=rec, frame_a=frame):
                     ok = n = 0
-                    for r in np.unique(rec):
-                        m = np.flatnonzero(rec == r)
-                        m = m[np.argsort(frame[m])]
+                    for r in np.unique(rec_a):
+                        m = np.flatnonzero(rec_a == r)
+                        m = m[np.argsort(frame_a[m])]
                         for blk in windows(m, args.window):
                             ok += int(np.log(P[blk] + 1e-12).mean(0).argmax() == g[blk[0]])
                             n += 1
-                    accs[name].append(ok / max(n, 1))
+                    return ok / max(n, 1)
+
+                for name, P, g in (("cnn_w", sn, gold), ("met_w", pm, goldK),
+                                   ("geo_w", pg, goldK)):
+                    accs[name].append(win_acc(P, g))
+                # 13.18: "the FUSION column inherits the optimism" of the
+                # approximated CNN. Where wave 18 retrained the network on this
+                # exact (K, draw), fuse the metric posteriors with the
+                # RETRAINED posteriors on the shared frames instead -- this is
+                # the honest fusion point for the curve. Class order matches by
+                # construction: the trainer's classes are sorted subjects of
+                # the drawn cohort, which is exactly sorted(pick) = cmapK.
+                for rz, rsel in rt_cells:
+                    rclasses = [str(c) for c in rz["classes"]]
+                    if rclasses != [str(p) for p in pick]:
+                        print(f"    !! K={K} d={d}: retrained classes differ from "
+                              f"the draw -- skipped (retrained {rclasses[:3]}..., "
+                              f"draw {[str(p) for p in pick][:3]}...)")
+                        continue
+                    rr = rz["test_rows"][rsel]
+                    pos = {int(r): i for i, r in enumerate(rr)}
+                    idx = np.array([pos.get(int(r), -1) for r in rs])
+                    okr = idx >= 0
+                    if okr.sum() < 30:
+                        continue
+                    rp = rz["prob"].astype(np.float64)[rsel][idx[okr]]
+                    rp /= np.clip(rp.sum(1, keepdims=True), 1e-12, None)
+                    pg_rt = np.exp(np.log(rp + 1e-12) + np.log(pm[okr] + 1e-12))
+                    accs["geo_rt_w"].append(
+                        win_acc(pg_rt, goldK[okr], rec[okr], frame[okr]))
             for k in per:
                 if accs[k]:
                     per[k].append(float(np.mean(accs[k])))
@@ -181,7 +212,8 @@ def main():
               f"{m['met_f']:>13.2f}%{m['cnn_w']:>8.2f}%{m['met_w']:>11.2f}%"
               f"{m['geo_w']:>8.2f}%{m['geo_w'] * K / 100:>9.1f}x"
               f"{spread:>10.1f}pp"
-              + (f"{m['cnn_rt']:>11.2f}% " if 'cnn_rt' in m else f"{'--':>13s}"))
+              + (f"{m['cnn_rt']:>11.2f}% " if 'cnn_rt' in m else f"{'--':>13s}")
+              + (f"{m['geo_rt_w']:>14.2f}% " if 'geo_rt_w' in m else f"{'--':>16s}"))
         report[str(K)] = dict(mean=m, spread_geo_w=spread,
                               draws={k: v for k, v in per.items()})
 
@@ -190,6 +222,10 @@ def main():
     print("restricted to the K enrolled columns; wave 18 retrains it per cohort so the")
     print("size of that approximation can be quantified. `spread` is the range across")
     print("draws: at small K a cohort can be easy or hard, and the mean hides that.")
+    print("`geo retrain @W` fuses metric with the RETRAINED posteriors where wave 18")
+    print("covered the (K, draw) -- the honest fusion point; `geo @W` inherits the")
+    print("approximated CNN's optimism and must be labelled an upper bound where the")
+    print("retrained column is absent.")
     if args.out:
         path = os.path.join(args.out, "cohort.json")
         json.dump(report, open(path, "w"), indent=1)

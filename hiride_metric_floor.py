@@ -31,6 +31,7 @@ import numpy as np
 
 from hiride_data import load_manifest, make_split, block_train_counts, eligible_mask
 from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
+from hiride_stats import cluster_boot, boot_rng
 
 LADDER = [("R0_frame_random", {}), ("R1_block", dict(guard=150)),
           ("R3_cross_recording", {}), ("R4_cross_session", {})]
@@ -62,6 +63,13 @@ def main():
     ap.add_argument("--out", default=None)
     ap.add_argument("--seeds", type=int, default=3)
     ap.add_argument("--perm-draws", type=int, default=5)
+    ap.add_argument("--boot", type=int, default=20000,
+                    help="subject-cluster bootstrap draws per (rung, set, seed). "
+                         "Every CNN number in the paper carries a subject-level "
+                         "interval; until now the metric floor's 19.04 %% at R4 "
+                         "had none, with n = 28 subjects the binding constraint "
+                         "as everywhere else.")
+    ap.add_argument("--boot-seed", type=int, default=0)
     # Both default to prior behaviour, so an un-flagged run reproduces the
     # published 19.04 % exactly.
     ap.add_argument("--eligibility", choices=("cues", "full_body"), default="cues",
@@ -169,16 +177,19 @@ def main():
 
     report = {}
     hdr = (f"{'split':<20s}{'feature set':<17s}{'n':>2s}{'acc':>9s}{'per-subj':>10s}"
-           f"{'null':>8s}{'1/K':>7s}{'majority':>10s}{'n_train':>9s}")
+           f"{'null':>8s}{'1/K':>7s}{'majority':>10s}{'n_train':>9s}"
+           f"{'subj-boot 95% CI':>21s}")
     print("\n" + hdr); print("-" * len(hdr))
     for pol, kw in LADDER:
-        if pol.startswith("R1"):
-            kw = dict(kw, match_ntrain=block_train_counts(
-                man, guard=150, seed=0, keep=keep_ref & have))
         try:
+            if pol.startswith("R1"):
+                kw = dict(kw, match_ntrain=block_train_counts(
+                    man, guard=150, seed=0, keep=keep_ref & have))
             tr, va, te = make_split(man, pol, seed=0, keep=keep, **kw)
         except Exception as e:
-            print(f"{pol:<20s} unavailable: {type(e).__name__}")
+            # skip the rung, never the ladder -- this runs unattended in the
+            # overnight analysis chain
+            print(f"{pol:<20s} unavailable: {type(e).__name__}: {e}")
             continue
         classes = sorted(set(man["subject"][tr].tolist()))
         cmap = {c: i for i, c in enumerate(classes)}
@@ -274,26 +285,41 @@ def main():
                     continue
                 Xall[:, j] = full[:, j] - float((X * Y).sum() / vx) * (p_med / 1000.0)
 
+        te_subj = np.asarray(man["subject"][te], dtype=str)
         for sname, cols in SETS.items():
-            accs, pers = [], []
+            accs, pers, los, his = [], [], [], []
             for s in range(args.seeds):
-                a, p, imp, _ = fit_eval(Xall[tr][:, cols], ytr, Xall[te][:, cols], yte, s)
+                a, p, imp, pred = fit_eval(Xall[tr][:, cols], ytr, Xall[te][:, cols], yte, s)
                 accs.append(a); pers.append(p)
+                # Subject-cluster CI per seed, mean of bounds over seeds --
+                # exactly hiride_stats.py's convention for the CNN cells, with
+                # the interval's RNG keyed on the quantity's own identity so it
+                # cannot depend on processing order (13.7).
+                lo, hi = cluster_boot((pred == yte).astype(float), te_subj,
+                                      boot_rng(args.boot_seed,
+                                               ("mfloor", pol, sname, s,
+                                                args.eligibility,
+                                                args.test_eligibility)),
+                                      args.boot)
+                los.append(lo); his.append(hi)
             nulls = []
             for d in range(args.perm_draws):
                 rng = np.random.default_rng(5000 + d)
                 a, _, _, _ = fit_eval(Xall[tr][:, cols], rng.permutation(ytr),
                                       Xall[te][:, cols], yte, d)
                 nulls.append(a)
+            flag = " *" if np.mean(los) > maj else ""
             print(f"{pol:<20s}{sname:<17s}{args.seeds:>2d}"
                   f"{100 * np.mean(accs):8.2f}%{100 * np.mean(pers):9.2f}%"
                   f"{100 * np.mean(nulls):7.2f}%{100 / len(classes):6.2f}%"
-                  f"{100 * maj:9.2f}%{len(tr):9d}")
+                  f"{100 * maj:9.2f}%{len(tr):9d}"
+                  f"   [{100 * np.mean(los):5.2f}, {100 * np.mean(his):5.2f}]{flag}")
             report[f"{pol}|{sname}"] = dict(
                 policy=pol, feature_set=sname, n_features=len(cols),
                 acc=float(np.mean(accs)), acc_sd=float(np.std(accs)),
                 per_subject=float(np.mean(pers)), null=float(np.mean(nulls)),
-                chance=1.0 / len(classes), majority=maj,
+                subj_ci_lo=float(np.mean(los)), subj_ci_hi=float(np.mean(his)),
+                boot=args.boot, chance=1.0 / len(classes), majority=maj,
                 n_train=int(len(tr)), n_test=int(len(te)))
         # which metric features carry it
         _, _, imp, _ = fit_eval(Xall[tr][:, metric], ytr, Xall[te][:, metric], yte, 0)

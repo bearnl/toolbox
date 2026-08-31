@@ -230,7 +230,7 @@ def build_convnext(input_shape, n_classes, pretrained=True, head="gap", aux_dim=
 CELL_FIELDS = ("policy", "modality", "arch", "init", "condition", "seed", "guard",
                "permuted", "bits", "depth_slab_mm", "frames", "encoding", "erode",
                "head", "eligibility", "ref_eligibility", "augment", "test_fuse",
-               "aux", "cohort", "cohort_seed")
+               "aux", "cohort", "cohort_seed", "mask_source")
 
 
 def _axis(rec, field):
@@ -269,7 +269,8 @@ def run_tag(m):
             + (f"_ref{m['ref_eligibility']}"
                if m.get("ref_eligibility", "match") != "match" else "")
             + (f"_aux{m['aux']}" if m.get("aux", "none") != "none" else "")
-            + (f"_k{m['cohort']}d{m['cohort_seed']}" if m.get("cohort") else ""))
+            + (f"_k{m['cohort']}d{m['cohort_seed']}" if m.get("cohort") else "")
+            + (f"_m{m['mask_source']}" if m.get("mask_source", "user") != "user" else ""))
 
 
 def scale_remove(img, mask, fill, is_depth, target_h=SCALE_TARGET_H,
@@ -458,14 +459,23 @@ def apply_mask_condition(img, mask, condition, fill, slab_mm=DEPTH_CLIP_MM,
 SEQ_TAGS = ("training", "testing_still", "testing_walking")
 
 
-def open_shards(prep, modality):
+def open_shards(prep, modality, mask_source="user"):
     """Map every manifest row to (image shard, mask shard, position).
 
     hiride_prep writes ONE SHARD PER SEQUENCE -- `training_depth.npy`,
     `testing_walking_depth.npy`, ... -- each with a `<tag>_index.npz` giving the
     manifest rows it holds, in shard order. A split like R4_cross_session spans
     two sequences, so the trainer has to resolve rows across shards.
+
+    `mask_source` selects which mask shard the conditions cut with:
+      user    <tag>_mask.npy     -- the shipped userMap (depth-derived; what a
+                                    DEPTH system has at runtime)
+      rgbseg  <tag>_maskrgb.npy  -- an RGB-derived person segmentation, written
+                                    by hiride_rgbseg.py (what an RGB-ONLY system
+                                    could actually obtain; closes the 13.15
+                                    asymmetry as a measurement, not a caveat)
     """
+    mask_file = {"user": "mask", "rgbseg": "maskrgb"}[mask_source]
     imgs, masks, where = {}, {}, {}
     for tag in SEQ_TAGS:
         ipath = os.path.join(prep, f"{tag}_index.npz")
@@ -473,10 +483,16 @@ def open_shards(prep, modality):
             continue
         rows = np.load(ipath)["manifest_row"]
         imgs[tag] = np.load(os.path.join(prep, f"{tag}_{modality}.npy"), mmap_mode="r")
-        mp = os.path.join(prep, f"{tag}_mask.npy")
+        mp = os.path.join(prep, f"{tag}_{mask_file}.npy")
         # A prep with no segmentation (in-house) writes no mask shard. Carry None
         # rather than a zero array: a fake all-background mask would let every
-        # mask condition run and return silent nonsense.
+        # mask condition run and return silent nonsense. Same rule for a missing
+        # rgbseg shard -- refusing beats silently falling back to the userMap,
+        # which would label an oracle-mask run as a deployable-mask one.
+        if mask_source != "user" and not os.path.exists(mp):
+            raise FileNotFoundError(
+                f"{mp} missing. --mask-source {mask_source} needs the RGB-derived "
+                f"mask shards:\n  python hiride_rgbseg.py --prep {prep}")
         masks[tag] = np.load(mp, mmap_mode="r") if os.path.exists(mp) else None
         for pos, row in enumerate(rows):
             where[int(row)] = (tag, pos)
@@ -782,6 +798,15 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--guard", type=int, default=150)
     ap.add_argument("--ref-guard", type=int, default=150)
+    ap.add_argument("--cross-val-guard", type=int, default=50,
+                    help="R3/R4 only: the guard between the training block and "
+                         "the validation tail carved from each TRAINING "
+                         "recording (hiride_data._policy_cross's `guard`; the "
+                         "test set is untouched). Default 50 = the behaviour "
+                         "of every BIWI run. TVRID tracklets are ~40 frames, "
+                         "so its wave sets 5 -- like --ref-guard this is a "
+                         "construction detail, constant within one runs dir, "
+                         "and deliberately NOT a cell axis.")
     ap.add_argument("--ref-eligibility", choices=("match", "cues"), default="match",
                     help="which frame filter the R1 match_ntrain reference is computed "
                          "under. 'match' uses --eligibility (default); 'cues' uses the "
@@ -826,14 +851,31 @@ def main():
                     help="which draw of K subjects. Vary it: a single subset is "
                          "one sample of an easy-or-hard cohort, not a "
                          "measurement of cohort size.")
-    ap.add_argument("--aux", choices=("none", "dist"), default="none",
+    ap.add_argument("--aux", choices=("none", "dist", "metric"), default="none",
                     help="`dist` appends the subject's standing distance "
                          "(cues p_med, z-scored on TRAIN rows) to the pooled "
                          "image features. It is the one quantity needed to "
                          "turn pixel extent into millimetres, and the network "
                          "is otherwise never given it. Uses cues.npz, so the "
                          "frame set is UNCHANGED and these cells compare "
-                         "directly against their --aux none partners.")
+                         "directly against their --aux none partners. "
+                         "`metric` appends the 12 published metric scalars "
+                         "(hiride_metric.BASE_METRIC, z-scored on TRAIN rows) "
+                         "-- FEATURE-level fusion. Score-level fusion proved "
+                         "the two representations complementary (~8 pp oracle "
+                         "headroom, 13.10) but no fixed posterior rule "
+                         "captured it; a joint model can learn a "
+                         "frame-dependent combination. Frames lacking metric "
+                         "features get the train mean (= 0 after z-scoring), "
+                         "so the frame set is again UNCHANGED.")
+    ap.add_argument("--mask-source", choices=("user", "rgbseg"), default="user",
+                    help="which person mask the mask conditions cut with. "
+                         "`user` = the shipped userMap: depth-derived, so "
+                         "masked-DEPTH rows describe a deployable depth "
+                         "system while masked-RGB rows describe an RGB-D one "
+                         "(13.15). `rgbseg` = an RGB-derived segmentation "
+                         "(hiride_rgbseg.py), what an RGB-ONLY camera could "
+                         "obtain -- converts that caveat into a measurement.")
     ap.add_argument("--erode", type=int, default=2,
                     help="pixels to erode the mask by for interior_only; also drops the "
                          "rim contaminated by prep's AREA resize.")
@@ -884,6 +926,8 @@ def main():
             ref_keep = eligible_mask(cues["cues"], feats, full_body=False)
 
     kw = {}
+    if args.policy.startswith(("R3", "R4")):
+        kw = dict(guard=args.cross_val_guard)
     if args.policy.startswith("R1"):
         # The reference counts that match_ntrain subsamples toward. Under
         # --eligibility full_body, computing them from the SAME mask starves
@@ -958,7 +1002,7 @@ def main():
         assert (y[rows] >= 0).all(), "permutation leaked an out-of-map label"
 
     t0 = time.time()
-    shards = open_shards(args.prep, args.modality)
+    shards = open_shards(args.prep, args.modality, args.mask_source)
     plates = (open_plates(args.prep, args.modality, man)
               if args.condition in PLATE_CONDITIONS else None)
     Xtr = load_split_arrays(shards, tr, args.modality, args.condition, args.bits,
@@ -984,6 +1028,35 @@ def main():
         Atr, Ava, Ate = ((pm[i] - mu).reshape(-1, 1) / sd for i in (tr, va, te))
         aux_dim = 1
         print(f"[aux] standing distance, train mean {mu:.0f} mm sd {sd:.0f} mm")
+    elif args.aux == "metric":
+        # The 12 published metric scalars (BASE_METRIC), aligned to manifest
+        # rows exactly as hiride_fuse.load_metric does. Per-frame quantities
+        # from that frame's own depth + mask -- nothing crosses frames, so no
+        # split can leak through them. z-scored on TRAIN rows only; rows
+        # without metric features (person < 200 px) get the train mean, i.e. 0,
+        # so the frame set matches the --aux none partner exactly.
+        from hiride_metric import BASE_METRIC
+        mf = np.load(os.path.join(args.prep, "metric_features.npz"),
+                     allow_pickle=False)
+        mnames = [str(n) for n in mf["names"]]
+        cols = [mnames.index(n) for n in BASE_METRIC if n in mnames]
+        if len(cols) != len(BASE_METRIC):
+            sys.exit(f"error: metric_features.npz holds {len(cols)} of the "
+                     f"{len(BASE_METRIC)} published metric columns -- re-run "
+                     f"hiride_metric.py before using --aux metric.")
+        A = np.full((len(man["subject"]), len(cols)), np.nan, dtype=np.float32)
+        A[mf["manifest_row"]] = mf["feats"][:, cols]
+        mu = np.nanmean(A[tr], axis=0)
+        sd = np.nanstd(A[tr], axis=0)
+        sd[sd == 0] = 1.0
+        A = (A - mu) / sd
+        A = np.nan_to_num(A, nan=0.0)
+        Atr, Ava, Ate = A[tr], A[va], A[te]
+        aux_dim = len(cols)
+        miss_tr = int((~np.isin(tr, mf["manifest_row"])).sum())
+        miss_te = int((~np.isin(te, mf["manifest_row"])).sum())
+        print(f"[aux] {aux_dim} metric scalars; imputed train {miss_tr}/{len(tr)}, "
+              f"test {miss_te}/{len(te)} rows at the train mean")
 
     shape = Xtr.shape[1:]
     model = (build_alexnet(shape, len(classes), args.head, aux_dim=aux_dim)
@@ -1031,6 +1104,14 @@ def main():
     assert prob.shape[0] == len(te), (prob.shape, len(te))
     pred = np.argmax(prob, axis=1)
     truth = y[te]
+    # VALIDATION posteriors, on the restored best weights. Until now only test
+    # rows were stored, so no fusion weight could be chosen without touching
+    # the test set -- which is what forced the fixed-weight rules in 13.10.
+    # Val rows are within-session for R3/R4, so a weight tuned on them answers
+    # "best within-session mixture", not the cross-session optimum; that caveat
+    # travels with any use of these, but tuned-on-val is at least honest.
+    vprob = predict_seq(model, ArrayBatches(Xva, None, args.batch_size, A=Ava))
+    assert vprob.shape[0] == len(va), (vprob.shape, len(va))
     labels = list(range(len(classes)))          # 2023 omitted labels=, so the
                                                 # macro denominator moved per epoch
     per_subject = [float((pred[truth == c] == c).mean())
@@ -1084,6 +1165,9 @@ def main():
         frames=args.frames, encoding=args.depth_encoding, erode=args.erode, head=args.head,
         eligibility=args.eligibility, ref_eligibility=args.ref_eligibility,
         aux=args.aux, cohort=args.cohort, cohort_seed=args.cohort_seed,
+        mask_source=args.mask_source,
+        cross_val_guard=(args.cross_val_guard
+                         if args.policy.startswith(("R3", "R4")) else None),
         augment=args.augment, **fused,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),
@@ -1134,7 +1218,11 @@ def main():
                         test_rows=np.asarray(te, dtype=np.int64),
                         test_subject=man["subject"][te],
                         truth=truth.astype(np.int64), pred=pred.astype(np.int64),
-                        prob=prob.astype(np.float16))
+                        prob=prob.astype(np.float16),
+                        val_rows=np.asarray(va, dtype=np.int64),
+                        val_subject=man["subject"][va],
+                        val_truth=y[va].astype(np.int64),
+                        val_prob=vprob.astype(np.float16))
     print(f"[done] {tag}  acc={res['frame_acc'] * 100:.2f}% "
           f"({res['x_chance']:.1f}x chance {res['chance'] * 100:.2f}%)  "
           f"per-subj={res['per_subject_acc'] * 100:.2f}%  "

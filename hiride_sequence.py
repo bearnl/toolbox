@@ -239,20 +239,29 @@ def main():
                 pc = np.stack([np.log(p_cnn[b] + 1e-12).mean(0) for b in bte])
                 acc["geo_agg"][w].append(
                     float(((pc + np.log(pw + 1e-12)).argmax(1) == yte).mean()))
-            # per-DECISION correctness at the reporting window, for a
-            # subject-clustered interval. Clustering is by subject, not by
+            # per-DECISION record at the reporting window: correctness for the
+            # subject-clustered interval, plus the truth's RANK (top-k) and the
+            # decision's CONFIDENCE (max renormalised posterior, for the
+            # answer-only-when-sure curve). Clustering is by subject, not by
             # window, because several windows from one recording are not
-            # independent observations of anything.
+            # independent observations of anything. Block order is identical
+            # for all three models, which is what makes the paired contrasts
+            # below legitimate.
             for k, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
-                cor, sub = [], []
+                cor, sub, rnk, cnf = [], [], [], []
                 for r in np.unique(rec):
                     m = np.flatnonzero(rec == r)
                     m = m[np.argsort(frame[m])]
                     for blk in windows(m, args.ci_window):
-                        p = np.log(P[blk] + 1e-12).mean(0)
-                        cor.append(float(p.argmax() == truth[blk[0]]))
+                        lp = np.log(P[blk] + 1e-12).mean(0)
+                        t = int(truth[blk[0]])
+                        cor.append(float(lp.argmax() == t))
+                        rnk.append(int((lp > lp[t]).sum()) + 1)
+                        p = np.exp(lp - lp.max())
+                        cnf.append(float(p.max() / p.sum()))
                         sub.append(r.split("|")[1])
-                tail[k].append((np.array(cor), np.array(sub)))
+                tail[k].append(dict(cor=np.array(cor), sub=np.array(sub),
+                                    rank=np.array(rnk), conf=np.array(cnf)))
 
         hdr = (f"{'frames/decision':>16s}{'decisions':>11s}{'cnn':>9s}"
                f"{'metric':>9s}{'geo':>9s}{'met_agg':>10s}{'geo_agg':>10s}")
@@ -271,17 +280,103 @@ def main():
               f"decisions):")
         cis = {}
         for k in ("cnn", "metric", "geo"):
-            per = [cluster_boot(c, s, boot_rng(args.seed, ("seq", cond, k, args.ci_window, i)), args.boot)
-                   for i, (c, s) in enumerate(tail[k])]
+            per = [cluster_boot(d["cor"], d["sub"],
+                                boot_rng(args.seed, ("seq", cond, k, args.ci_window, i)),
+                                args.boot)
+                   for i, d in enumerate(tail[k])]
             cis[k] = [float(np.mean([p[0] for p in per])),
                       float(np.mean([p[1] for p in per]))]
             print(f"    {k:<8s}{100 * np.mean(acc[k].get(args.ci_window, acc[k][0])):>7.2f}%  "
                   f"[{100 * cis[k][0]:+.1f}, {100 * cis[k][1]:+.1f}]")
+
+        # ---- PAIRED contrasts at the reporting window --------------------
+        # The abstract must not claim "fusion adds X pp over metric" from two
+        # overlapping marginal intervals; the quantity that licenses (or
+        # forbids) that sentence is the PAIRED per-decision difference,
+        # subject-clustered -- the same discipline 13.10 applied at frame
+        # level, now at the operating point.
+        contrasts = {}
+        print(f"  paired contrasts at {lab} (same decisions, subject-cluster CI):")
+        for a, b in (("geo", "metric"), ("cnn", "metric"), ("geo", "cnn")):
+            per, dmeans = [], []
+            for i, (da, db) in enumerate(zip(tail[a], tail[b])):
+                assert len(da["cor"]) == len(db["cor"])
+                diff = da["cor"] - db["cor"]
+                dmeans.append(float(diff.mean()))
+                per.append(cluster_boot(diff, da["sub"],
+                                        boot_rng(args.seed, ("seqpair", cond, a, b,
+                                                             args.ci_window, i)),
+                                        args.boot))
+            lo = float(np.mean([p[0] for p in per]))
+            hi = float(np.mean([p[1] for p in per]))
+            contrasts[f"{a}-{b}"] = dict(diff=float(np.mean(dmeans)), ci=[lo, hi])
+            flag = "" if lo * hi > 0 else "   (interval straddles zero)"
+            print(f"    {a}-{b:<12s}{100 * np.mean(dmeans):>+7.2f} pp  "
+                  f"[{100 * lo:+.2f}, {100 * hi:+.2f}]{flag}")
+
+        # ---- top-k at the reporting window -------------------------------
+        # Closed-set softmax reporting, NOT a CMC curve (open-set ranking is
+        # paper 3's). "The right person is in the top 3" is the deployment
+        # question for a shortlist-then-confirm system.
+        topk = {}
+        for k in ("cnn", "metric", "geo"):
+            topk[k] = {f"top{n}": float(np.mean([np.mean(d["rank"] <= n)
+                                                 for d in tail[k]]))
+                       for n in (1, 3, 5)}
+        print("  top-k at the window (mean over seeds): "
+              + "   ".join(f"{k} " + "/".join(f"{100 * topk[k][f'top{n}']:.1f}"
+                                              for n in (1, 3, 5))
+                           for k in ("cnn", "metric", "geo")) + "   (top1/3/5 %)")
+
+        # ---- per-subject identifiability ---------------------------------
+        # The cohort curve showed WHO is enrolled dominates at small K (60 pp
+        # draw spread); this is the per-person version. For the privacy
+        # framing the spread is the finding: identifiability is a property of
+        # the individual, not only of the system.
+        per_subj = {}
+        for k in ("metric", "geo"):
+            accum = {}
+            for d in tail[k]:
+                for s in np.unique(d["sub"]):
+                    accum.setdefault(str(s), []).append(float(d["cor"][d["sub"] == s].mean()))
+            per_subj[k] = {s: float(np.mean(v)) for s, v in accum.items()}
+        vals = sorted(per_subj["geo"].values())
+        if vals:
+            print(f"  per-subject decision accuracy (geo): min {100 * vals[0]:.0f}%, "
+                  f"median {100 * np.median(vals):.0f}%, max {100 * vals[-1]:.0f}%; "
+                  f"{sum(v == 0 for v in vals)} of {len(vals)} subjects never identified, "
+                  f"{sum(v >= 0.99 for v in vals)} always")
+
+        # ---- answer-only-when-sure (confidence-gated coverage) -----------
+        # A deployed system need not answer every window. Sweep a threshold on
+        # the decision's max posterior; report accuracy vs the fraction of
+        # decisions retained. Threshold grid is fixed (deciles of a uniform
+        # grid), nothing is tuned.
+        coverage = {}
+        for k in ("metric", "geo"):
+            conf = np.concatenate([d["conf"] for d in tail[k]])
+            cor = np.concatenate([d["cor"] for d in tail[k]])
+            curve = []
+            for thr in np.linspace(0.0, 0.9, 10):
+                sel = conf >= thr
+                if sel.sum() < 5:
+                    break
+                curve.append(dict(threshold=float(thr),
+                                  coverage=float(sel.mean()),
+                                  acc=float(cor[sel].mean())))
+            coverage[k] = curve
+        if coverage.get("geo"):
+            mid = min(coverage["geo"], key=lambda c: abs(c["coverage"] - 0.5))
+            print(f"  answer-when-sure (geo): at {100 * mid['coverage']:.0f}% coverage, "
+                  f"accuracy {100 * mid['acc']:.1f}% (threshold {mid['threshold']:.2f})")
+
         report[cond] = dict(windows=W,
                             acc={k: {str(w): float(np.mean(v)) for w, v in d.items()}
                                  for k, d in acc.items()},
                             n_decisions={str(w): float(np.mean(v)) for w, v in ndec.items()},
-                            ci_window=args.ci_window, ci=cis)
+                            ci_window=args.ci_window, ci=cis,
+                            contrasts=contrasts, topk=topk,
+                            per_subject=per_subj, coverage=coverage)
 
     if args.out:
         # settings travel WITH the numbers: a curve read months later must say

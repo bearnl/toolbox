@@ -33,6 +33,15 @@ diagnostics. Every element of the §4 design is measured or explicitly ruled out
 stated reason. **Nothing computational is outstanding.** The next stage is the manuscript
 and its figures — see §11.
 
+**UPDATE 2026-08-31 — one final pre-manuscript batch exists (§14).** The author closed
+the two open decisions (2023 paper: rejected everywhere, so fresh submission; external
+validity: option 1, second corpus) and asked for the remaining B/C items as one
+submission: waves 19 (feature-level fusion), 20 (RGB-derived segmentation control),
+21 (second-corpus ladder), a wave-16 idempotent top-up, latency, the signal-fair re-run,
+and a full analysis regeneration. `bash submit_paper2_final.sh` on a login node, then
+`bash collect_final.sh` in the morning. §14 records everything, including the verified
+userMap provenance (§14.2) and the paper-3 sync (§14.4).
+
 **READ §12 FIRST if you are picking this up after 2026-08-18** — metric 3D features
 and a changed CNN head beat every number in §8, and six other interventions were
 refuted by measurement.
@@ -427,8 +436,13 @@ Both Testing sequences carry the **same 28 subjects**, so `R3_cross_recording` a
 where only `Training/` existed.
 
 ### 5.2 userMap forensics
-- Values run **0–6** — OpenNI *user indices*. Binarise `> 0`, **never `== 1`** (subject 022
-  changes index mid-recording; `== 1` silently deletes part of a recording).
+- Values run **0–6** — **Microsoft Kinect SDK v1 *player indices*** (verified against the
+  SDK docs and the dataset's own documentation, 2026-08-31 — an earlier note here said
+  "OpenNI user indices", which is wrong: NITE user IDs are not capped at 6, MS SDK's are;
+  and BIWI was captured with the MS SDK while OpenNI+NITE was used for the authors'
+  *separate* IAS-Lab RGBD-ID dataset). Binarise `> 0`, **never `== 1`** (subject 022
+  changes index mid-recording — the SDK assigns a NEW random player slot when it
+  re-acquires a lost user, per its own docs; `== 1` silently deletes part of a recording).
 - **22.3 %** of frames have a completely empty userMap, and in **all 50 subjects** these form
   **exactly one contiguous mid-recording run** (000: 376–468 of 596; 001: 228–320 of 421;
   002: 284–380 of 511; 003: 260–344 of 412; 004: 176–272 of 344; 005: 236–340 of 419).
@@ -2111,8 +2125,11 @@ the opposite conclusion, as the author did.
 **Call it what it is: not ground truth.** §0 currently says "the dataset's
 shipped ground-truth masks". The userMap is sensor-stack OUTPUT, not human
 annotation — which is what makes it available at deployment for a depth system.
-CONFIRM AGAINST THE BIWI DOCUMENTATION BEFORE PUBLISHING, because the whole
-deployability argument above turns on it.
+~~CONFIRM AGAINST THE BIWI DOCUMENTATION BEFORE PUBLISHING, because the whole
+deployability argument above turns on it.~~ **CONFIRMED 2026-08-31 (§14.2): the
+maps are the live Microsoft Kinect SDK v1 player-index segmentation, per the
+dataset page, the Munaro 2014 chapter and the SDK format docs. The
+deployability argument stands; use §14.2's caption sentence.**
 
 **And it is not free even for depth.** §12.5: naive depth segmentation (1500 mm
 slab + largest connected component) reaches recall 0.976 but precision 0.204,
@@ -2365,6 +2382,196 @@ COHORT axis only; room, camera pose and protocol remain single-sourced, and
    and settle the external-validity question in §3 before drafting. Old item: (`stripe/aug8/tf10`,
    18.01 % at R4 rather than the 14.59 % gap-head cell used there) and with more
    seeds, then regenerate every figure and table that quotes an R4 number.
-8. Have the trainer save posteriors for VALIDATION rows, not just test rows.
-   Without them no fusion weight can be chosen without touching the test set,
-   which is what forced the fixed-weight rules in §13.10.
+8. ~~Have the trainer save posteriors for VALIDATION rows, not just test rows.~~
+   DONE 2026-08-31 (§14.1): every cell trained from now on stores
+   `val_rows/val_subject/val_truth/val_prob` in its `cm_*.npz`. Cells from
+   earlier waves do not have them — a val-tuned fusion weight is only possible
+   on wave-19+ cells or after re-runs.
+
+---
+
+## 14. Session record 2026-08-31 — decisions closed, the final batch, and the sync
+
+Everything here was prepared on the laptop and lands on the cluster via ONE
+login-node command:
+
+```bash
+cd ~/toolbox && git pull && bash submit_paper2_final.sh   # then, next morning:
+bash collect_final.sh
+```
+
+The script states its own GPU budget before submitting (~170 cells + two short
+single jobs ≈ 10–14 GPU-h at %8 concurrency, overnight at FairShare 0.262) and
+ends with a CPU `hiride-analysis` job, dependent `afterany` on everything else,
+that regenerates every statistic, figure and table from artifacts — so the
+morning readout is one file even if individual cells failed.
+
+### 14.0 Two decisions closed by the author (2026-08-31)
+
+- **The 2023 manuscript was submitted several times and rejected every time; it
+  was never published.** So the new paper is a FRESH submission — no formal
+  erratum/retraction mechanics, no correction letter. §3's framing stands
+  unchanged; the word "retraction" in this document means the internal
+  withdrawal of the 0.99 claim, and the paper itself should simply supersede.
+- **External validity = option 1** (second public corpus, ladder only). See
+  §14.3 for the corpus and what its rungs mean.
+
+### 14.1 Code added this session (all additive; every default reproduces prior behaviour)
+
+| what | where | why |
+|---|---|---|
+| `--aux metric` (12 BASE_METRIC scalars at the head, z-scored on train) | `hiride_train.py` | feature-level fusion, the one experiment with proven ~8 pp headroom (§13.10); wave 19 |
+| `--mask-source rgbseg` + `hiride_rgbseg.py` (DeepLabV3 person masks from RGB alone) | trainer + new script | closes §13.15's oracle-mask asymmetry as a measurement; wave 20 |
+| val-row posteriors in `cm_*.npz` | trainer | §12.8 item 8 / §13.11 item 8 — enables honest fusion-weight tuning later |
+| `mask_source` axis | `hiride_keys.AXES`, `CELL_FIELDS`, `run_tag` | the ninth-bug pattern, pre-empted: new axis, added to the key in the same commit |
+| subject-cluster CIs in `hiride_metric_floor.py` | `--boot`, printed + JSON | §12.8 item 1 — 19.04 / 28.06 / 32.06 finally get intervals |
+| paired contrasts at the CI window (`geo−metric`, `cnn−metric`, `geo−cnn`) | `hiride_sequence.py` | THE missing headline statistic: whether "fusion 49.90 vs metric 43.30" is a real difference is decided by this paired CI, not by two overlapping marginals |
+| top-k, per-subject identifiability, answer-when-sure coverage | `hiride_sequence.py` | deployment-relevant closed-set reporting from stored posteriors; per-subject spread is the privacy finding at the individual level |
+| `geo_rt_w` retrained-fusion column | `hiride_cohort.py` | §13.18's "fusion inherits the optimism" — fused against wave 18's retrained posteriors at K=7/14/21 |
+| `hiride_dropcorr.py` | new | §11.1's untested prediction: per-identity R0→R1 drop vs near-duplicate ratio, Spearman over the 10 in-house identities |
+| `hiride_latency.py` | new | §11.4's measured efficiency negative result: exact params + throughput, 1ch vs 3ch, incl. a 2023-style Flatten→Dense head for the "where the size actually lived" sentence |
+| `hiride_iaslab_prep.py` + wave 21 | new | the second corpus (§14.3) |
+| waves 19 (60 cells) / 20 (30) / 21 / 16 top-up (38, idempotent) | `make_runs.py` | §14.0; wave 16 re-included as cheap insurance in case array `20165081` did not fully land |
+| `submit_paper2_final.sh` + `collect_final.sh` | new | the single submission; also re-runs `hiride_signal.py --per-class 400` at a 6 h wall (§12.8 item 3) and regenerates stats (`--boot 20000`, order-independent §13.7), metric floor (headline + full-body-test variants), sequence (gated + ungated), cohort, fusion, figures, `tables.tex` |
+
+Waves 2–18 still emit byte-identical runs files (verified), and legacy result
+filenames are unchanged by the new axes (verified — a file with no
+`mask_source` key resolves to the default through `AXES`, so the pre-write
+clash check cannot refuse old cells).
+
+### 14.2 userMap provenance — VERIFIED, the deployability argument stands
+
+Two independent web agents, full-text sources. Verdict: the `_userMap.pgm` is
+the **live Microsoft Kinect SDK v1 player-index segmentation**, produced by the
+tracker during acquisition — sensor-stack output, not manual annotation, not
+offline computation.
+
+- Dataset page (Munaro, 2013; via Wayback — the live site 404s): "synchronized
+  RGB images …, depth images, **persons' segmentation maps and skeletal data
+  (as provided by Microsoft Kinect SDK)**, in addition to the ground plane
+  coordinates."
+- Munaro et al. 2014 (the *Person Re-Identification* chapter): "For each
+  subject we provide … **a segmentation mask and the skeleton as provided by
+  the Kinect SDK**."
+- Format corroboration from the SDK docs: player indices are 0–6 by
+  specification (index 0 = no player, 1–6 = players) — which also retro-explains
+  §5.2's observations: subject 022's mid-recording index change is the SDK
+  assigning a fresh random slot on re-acquisition, and the 22.3 % contiguous
+  empty-map runs are tracker loss (SDK range ~0.8–4 m).
+- **Correction absorbed into §5.2**: the indices are Microsoft SDK player
+  slots, NOT OpenNI user IDs. OpenNI+NITE is what the same group used for the
+  *IAS-Lab* RGBD-ID dataset, per their ICRA 2014 paper — a fact §14.3 uses.
+- **Also now citable rather than merely measured**: the Testing session was
+  captured "on a different day", "in different locations", with "most subjects
+  … dressed differently" (chapter + dataset page). This is the documentation
+  backing for §8.6's finding that R4 = day + clothes + camera/room; note
+  "MOST subjects", not all — keep §8.6's measured +620 mm as the quantitative
+  statement.
+
+**Caption sentence for every mechanism-class table (use verbatim):**
+> "Masks are the BIWI RGBD-ID user maps — per-pixel player indices produced
+> online by the Microsoft Kinect SDK v1 tracker at acquisition time (Munaro et
+> al., 2014), not manual annotations — so masked-depth inputs correspond to
+> what the sensor middleware provides at runtime; for RGB no such runtime mask
+> exists, so masked-RGB rows describe an RGB-D system (see the rgbseg control)."
+
+Evidence PDFs/text are archived in the session scratchpad and the Wayback URLs
+are in the agent report quoted in the paper-writing notes; the chapter PDF and
+ICRA 2014 PDFs are the citable artifacts.
+
+### 14.3 The second corpus (external validity, axis 2) — TVRID, with the IAS-Lab caveat
+
+**The scientifically ideal corpus is gone from the public web.** IAS-Lab
+RGBD-ID (same group as BIWI; 11 people; Training + TestingA *different
+clothes* + TestingB *different room, same clothes*; BIWI-family per-frame
+files with a NiTE user map) would have supplied a true second clothing rung —
+but the origin (`robotics.dei.unipd.it/reid/...`) 404s everywhere, the Wayback
+Machine never captured the `.rar` payloads (CDX-verified), and no mirror
+exists on Kaggle / HF / Zenodo / Academic Torrents / GitHub / Baidu. Recovered
+dead links, for the record and for an author request:
+`https://robotics.dei.unipd.it/reid/dataset/iaslab_rgbd-id/{Training,TestingA,TestingB}.rar`.
+**ACTION FOR THE AUTHOR: e-mail Stefano Ghidoni / Emanuele Menegatti (still
+listed at IAS-Lab, robotics.dei.unipd.it/team) and ask for the three rar
+files** (license CC BY-NC-SA 3.0, © Munaro 2014). Two honesty notes if it
+arrives: no source says TestingA was a different DAY (only different clothes —
+do not claim "day"); and its frames were pre-filtered to all-joints-tracked,
+which changes the pose distribution relative to BIWI. Every other classic
+fallback is dead or gated: TUM-GAID officially withdrawn, DPI-T unrecoverable
+(host is a domain-parking page; payloads never archived), RobotPKU behind a
+Google-Drive sign-in, KinectREID/PAVIS pages 404, NTU RGB+D 120 needs a
+signed agreement and has undocumented subject×setup day semantics. **Also
+record for the paper's data-availability statement: BIWI RGBD-ID's own
+official source is equally dead** — our copy cannot currently be re-downloaded
+publicly.
+
+**The corpus that is actually obtainable — and now in wave 21 — is TVRID**
+(ICPR 2026 top-view RGB-D re-ID competition data; Zenodo
+DOI 10.5281/zenodo.20070280, CC-BY-4.0, open, no registration; ~15 GiB
+`original.zip` + a 9 KB labels zip, md5s in `submit_paper2_final.sh`).
+Verified by remote inspection of the zip central directory and the full labels
+file (2026-08-31), correcting two gaps in the public docs:
+
+- `original.zip` holds **raw 640×480 frames for ALL 88 identities** — 62 under
+  `train/<person>/<cam>/<passage>/` (de-anonymised paths) and 26 under
+  `test_public/<hash>/`, with `TVRID_labels/test_secret_map.csv` mapping every
+  hash to (person, camera, passage). The competition's own README documents
+  only the cropped "extracted" set; the raw tree above is measured, not
+  documented.
+- Depth is **16-bit grayscale PNG** (verified by decoding a member's header
+  remotely); 4 RealSense D455 cameras (`flat/upward/downward/upsideDown`),
+  2 passages per (person, camera), tracklets of ~25–65 frames at 15 fps,
+  captured 2024-10-22 (train) / 2024-10-24 (test-public).
+
+**What the ladder means on TVRID — the semantics travel with every number:**
+`hiride_tvrid_prep.py` maps passage1 → `Training` and passage2 →
+`Testing/Walking`, one tracklet = one recording (`group = seq|person|cam`), 88
+classes, chance 1.14 %. Then:
+
+| rung (BIWI name) | TVRID semantics |
+|---|---|
+| R0 | frame-random over passage1 — the leaky policy, as everywhere |
+| R1 g0 / g5 | contiguous block within a ~40-frame tracklet; guard 5 ≈ 0.33 s (tracklets cannot hold BIWI's guard 150), `--ref-guard 5` |
+| "R4" | **CROSS-PASSAGE**: passage1 → passage2, same day, same clothes, same cameras, minutes apart — an R3-analogue, NOT a session/clothing change |
+
+So TVRID replicates **C1** (the protocol collapse) on a third sensor
+technology (D455 stereo-IR, after Kinect v1 structured light and Azure Kinect
+ToF) and a third viewpoint family (top/oblique), and adds a recording-disjoint
+rung the in-house corpus could not support. **It does NOT test the clothing
+axis** — that remains BIWI-only unless the IAS-Lab e-mail succeeds, and the
+paper must say so (the §3 option-1/option-3 hybrid: C1 replicated on three
+corpora; C3's operating point stays BIWI's). Boundary note: TVRID is paper 3's
+*kind* of dataset (a re-ID competition); paper 2 uses it strictly as
+closed-set classification for the ladder — no CMC/mAP, no open-set protocol,
+and the competition itself is cited under §3's "mature subfield" point as
+before. Trainer detail: the cross rung needs `--cross-val-guard 5` (a
+construction detail like `--ref-guard`, constant per runs dir, deliberately
+not a cell axis), and everything runs `--eligibility all --condition full`
+(no masks, no cues — ladder only, mechanism suite stays BIWI-only).
+
+### 14.4 Paper-3 handoff synced
+
+`PAPER_HANDOFF.md` now opens with a dated correction block and carries inline
+corrections at §0, §2, §4.7, §4.8, §5, §7, §8 and a new blocking item in §10:
+the FOV-clipping diagnosis is withdrawn (with the replacement framing), the
+§4.7 anthropometry is flagged for re-derivation (its "heights" are 2.0–2.2 m —
+the room), and the 600 mm-slab training-path check is spelled out with the
+cheap verification recipe (dump 20 preprocessed crops from `siamese.py`'s own
+loader, overlay the userMap). Original text is kept struck through as record.
+Paper 3 is unsubmitted, so nothing public needs correcting.
+
+### 14.5 Open after this batch
+
+1. Read `collect_final.sh`'s output; the analysis job prints every number the
+   manuscript needs, regenerated. Anything still `PENDING` at read time will be
+   in the job-state table it prints first.
+2. The external-validity decision is now an EXECUTION, not a decision: if the
+   second corpus's ladder reproduces the R0→R1(→R4) collapse, §3's option 1 is
+   closed and the paper says so; if the corpus fails to prep (format surprises),
+   fall back to §3 option 3 wording — the submit script's prep job fails loudly
+   and everything else still lands.
+3. Draft the manuscript per §11.3 and the venue section, with §14.2's caption
+   sentence on every mechanism table.
+4. Wave 19's verdict decides one sentence: feature fusion either reaches toward
+   the ~27 % oracle or completes the negative arc (§13.10 → §13.17 → wave 19).
+5. Paper 3's author must run the §14.4 verification before that paper is
+   drafted.

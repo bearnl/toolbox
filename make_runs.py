@@ -396,10 +396,68 @@ WAVE18 = dict(
 )
 
 
+# Wave 19 -- FEATURE-LEVEL FUSION. Score-level fusion established that the CNN
+# and the 12 metric scalars fail on DIFFERENT frames (~8 pp oracle headroom at
+# R4, every interval clear of zero) and that no fixed posterior rule captures
+# it (13.10). The remaining test is a joint model: --aux metric concatenates
+# the z-scored scalars at the head, so the network can learn a frame-dependent
+# combination instead of a global weight. Run on the BEST recipe, paired
+# against --aux none partners generated in the same wave (R3 best-recipe cells
+# do not exist yet; regenerating existing R4 ones is idempotent). Either
+# outcome is a result: reaching ~27 % closes the headroom, staying at ~19-22 %
+# completes the negative arc (score fusion, aux dist, feature fusion -- all
+# tried, none realises the proven complementarity).
+WAVE19 = dict(
+    policies=[("R4_cross_session", ""), ("R3_cross_recording", "")],
+    conditions=["scale_removed", "sil_scaled", "person_centred"],
+    recipe="--head stripe --augment 8 --test-fuse 10",
+    seeds=[0, 1, 2, 3, 4],
+)
+
+# Wave 20 -- THE RGB-SEGMENTATION CONTROL (13.15 closed as a measurement). The
+# userMap is DEPTH-derived, so masked-rgb rows describe an RGB-D system, not an
+# RGB camera -- the oracle step advantages RGB, not depth. This wave re-runs
+# the rgb mask conditions with an RGB-DERIVED person segmentation
+# (hiride_rgbseg.py, torchvision DeepLabV3; the shards must exist first) at the
+# same gap-head recipe as the published 8.3 rows, so each cell pairs exactly
+# against its userMap partner. The rgb-only system's number is whatever
+# survives its own segmenter.
+WAVE20 = dict(
+    policies=[("R4_cross_session", ""), ("R3_cross_recording", "")],
+    conditions=["person", "scale_removed", "person_centred"],
+    seeds=[0, 1, 2, 3, 4],
+)
+
+
+# Wave 21 -- THE SECOND-CORPUS LADDER on TVRID (external validity, option 1 of
+# section 3, executed as far as a public corpus allows). hiride_tvrid_prep.py
+# normalises TVRID into BIWI sequence names, so the existing policies apply
+# unchanged -- but the SEMANTICS differ and must be stated wherever these
+# numbers appear: tracklets are ~25-65 frames at 15 fps, so R1's guard is 5
+# (not 150), and the R4-named rung is CROSS-PASSAGE (same day, same clothes,
+# minutes apart -- an R3-analogue). No public depth corpus with a multi-day
+# clothing change survives online (IAS-Lab RGBD-ID is dead everywhere;
+# HIRIDE_HANDOFF 14.3), so the clothing axis remains BIWI-only. Ladder only,
+# full-frame only, --eligibility all; mechanism suite stays BIWI-only.
+#   PREP=$SCRATCH/hiride2/prep_tvrid  OUT=$SCRATCH/hiride2/runs_tvrid
+WAVE21 = dict(
+    policies=[("R0_frame_random", ""),
+              ("R1_block", "--guard 0 --ref-guard 5"),
+              ("R1_block", "--guard 5 --ref-guard 5"),
+              ("R4_cross_session", "--cross-val-guard 5")],
+    modalities=["depth", "rgb"],
+    seeds=[0, 1, 2, 3, 4],
+    extra="--eligibility all",
+    control_policies=[("R1_block", "--guard 5 --ref-guard 5"),
+                      ("R4_cross_session", "--cross-val-guard 5")],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
-                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18))
+                    choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
+                             19, 20, 21))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -501,6 +559,34 @@ def main():
                             f"--policy {policy} --modality depth --arch alexnet "
                             f"--condition {cond} --seed {seed} --aux {aux} "
                             f"{extra}".strip())
+    elif args.wave == 19:
+        for policy, extra in WAVE19["policies"]:
+            for cond in WAVE19["conditions"]:
+                for seed in WAVE19["seeds"]:
+                    for aux in ("none", "metric"):
+                        lines.append(
+                            f"--policy {policy} --modality depth --arch alexnet "
+                            f"--condition {cond} --seed {seed} --aux {aux} "
+                            f"{WAVE19['recipe']} {extra}".strip())
+    elif args.wave == 20:
+        for policy, extra in WAVE20["policies"]:
+            for cond in WAVE20["conditions"]:
+                for seed in WAVE20["seeds"]:
+                    lines.append(
+                        f"--policy {policy} --modality rgb --arch alexnet "
+                        f"--condition {cond} --seed {seed} --mask-source rgbseg "
+                        f"{extra}".strip())
+    elif args.wave == 21:
+        for policy, extra in WAVE21["policies"]:
+            for mod in WAVE21["modalities"]:
+                for seed in WAVE21["seeds"]:
+                    lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
+                                 f"--seed {seed} {WAVE21['extra']} {extra}".strip())
+        for policy, extra in WAVE21["control_policies"]:
+            for seed in range(args.control_seeds):
+                lines.append(f"--policy {policy} --modality depth --arch alexnet "
+                             f"--seed {seed} --permute-labels {WAVE21['extra']} "
+                             f"{extra}".strip())
     elif args.wave == 16:
         for policy, extra in WAVE16["policies"]:
             for cond, mod, flags, seeds in WAVE16["cells"]:
