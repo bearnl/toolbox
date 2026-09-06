@@ -41,9 +41,12 @@ def per_subject_acc(runs, policy, modality, condition_key, arch="alexnet"):
             m = json.load(open(f))
         except (ValueError, OSError):
             continue
+        # wave 8's result files predate the trainer recording `eligibility`,
+        # so their key is "full" while newer --eligibility all cells key as
+        # "full/all"; both are the same experiment here
         if (m.get("policy") != policy or m.get("modality") != modality
                 or m.get("permuted") or arch_key(m) != arch
-                or cond_key(m) != condition_key):
+                or cond_key(m) not in (condition_key, condition_key.split("/")[0])):
             continue
         cm = os.path.join(runs, "cm_" + os.path.basename(f)[len("results_"):-len(".json")] + ".npz")
         if not os.path.exists(cm):

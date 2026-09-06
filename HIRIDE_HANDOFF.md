@@ -2692,19 +2692,31 @@ seeds, --boot 20000): R4 19.04 % [14.00, 24.40]; full-body-test 28.06
 [21.29, 34.66]; metric+shape full-body-test 32.06 [24.38, 39.58]; R3 15.56
 [9.97, 22.42]; R1 67.97 [59.31, 76.13]; R0 92.11 [90.44, 93.63] — every metric
 cell's lower bound clears the majority rate. Cohort curve with the retrained
-fusion column (this run used 3 draws — **re-run at 12 for the paper**): the
-approximated fusion overstated K = 7 by 17 pp (70.99 vs retrained 54.03),
-K = 14 by 5.8 (65.38 vs 59.57), K = 21 by 1.9 (51.80 vs 49.93); the honest
-fusion curve is 54.0 / 59.6 / 49.9 / 46.4 at K = 7 / 14 / 21 / 28, and at
-K = 7 retrained fusion (54.0) sits BELOW metric alone (62.4) — "fusion is not
-always better" stands. Latency (H100 MIG 1g.10gb, mixed fp16): AlexNet-gap
+fusion column, **12 draws (re-run 2026-09-06, final)**: metric@W 83.85 / 70.31 /
+63.00 / 56.86 / 50.08 / 43.30 at K = 4 / 7 / 10 / 14 / 21 / 28 (×chance 3.1 →
+13.0); draw spread at K = 4 **58.2 pp** (§13.18's finding reproduced), 26.8 at
+K = 7, 20.6 at K = 21. The approximated fusion overstated K = 7 by **18.6 pp**
+(72.64 vs retrained 54.03), K = 14 by 0.3 (59.88 vs 59.57), K = 21 by 4.0
+(53.90 vs 49.93); the honest fusion curve is **54.0 / 59.6 / 49.9 / 46.4** at
+K = 7 / 14 / 21 / 28, and at K = 7 retrained fusion (54.0) sits BELOW metric
+alone (70.3) — "fusion is not always better" stands, more strongly than before.
+Label the K = 4 and K = 10 fusion points as approximated upper bounds (no
+retrained cells there). Latency (H100 MIG 1g.10gb, mixed fp16): AlexNet-gap
 3,735,292 params at 1 channel vs 3,758,524 at 3 (0.62 %), 691 vs 562 fps at
 batch 32; a 2023-style Flatten→Dense(4096)×2 head is 72.0 M params at EITHER
 channel count — the input format is irrelevant to model size, the head was the
 size. Signal-fair (`--per-class 400`) completed through R4 at the 6 h wall.
-Dropcorr did NOT run: the archived `inhouse_probe.json` stores
-`far_ddepth_median = None` for every label; `hiride_dropcorr.py` now measures
+Dropcorr: the archived `inhouse_probe.json` stores
+`far_ddepth_median = None` for every label, so `hiride_dropcorr.py` now measures
 the near-duplicate ratio straight from the in-house shard (`--prep-inhouse`).
+Measured 2026-09-06 (adjacent / random-pair median |Δdepth|, mm → ratio): leo
+45.1/163.0 → **0.277**; bear 53.6/155.9 → 0.344; stephen 187.1/393.6 → 0.475;
+ranyi 0.565; lirunze 0.569; xiaoyu 0.641; man2 0.757; lady2 0.835; man1 0.849;
+lady1 **0.892**. BIWI aggregate reference: ratio 0.38, mean per-subject R0→R1
+drop +38.2 pp over 50 subjects. The per-identity correlation itself is pending
+one re-run: the first pass matched zero in-house cells because wave 8's result
+files predate the trainer recording `eligibility` (key `full`, not `full/all`)
+— fixed in the matcher.
 
 **Follow-ups (one short CPU session, minutes):**
 ```bash
@@ -2717,4 +2729,10 @@ python hiride_dropcorr.py --runs $SCRATCH/hiride2/runs_inhouse \
 ```
 then re-render fig 8 from the 12-draw `cohort.json` and archive off scratch
 (`results/` + a runs tarball + the commit SHA into `ARCHIVE_MANIFEST.txt`).
+**DONE 2026-09-06**: cohort at 12 draws written; ratios measured; archive at
+`~/projects/def-czarnuch/chenzz/hiride2/` now holds `results/`,
+`runs_20260906.tar.gz` (240 MB: runs + runs_inhouse + runs_tvrid) and
+`datasets/tvrid/` (the 15 GiB Zenodo zip + labels, kept because public corpora
+disappear — §14.3), with the SHA line in `ARCHIVE_MANIFEST.txt`. Remaining:
+the dropcorr correlation re-run (seconds) and fig 8 from the 12-draw JSON.
 After that the campaign is closed; what remains is the manuscript (§11.3).
