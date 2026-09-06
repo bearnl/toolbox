@@ -1,0 +1,159 @@
+# 05_standards_v1 — partial working notes recovered from the killed transcript
+(assistant-side text only; 2 blocks, 147 web actions)
+
+## Notes
+I'll start by loading the web tools, then work through the four areas systematically.
+
+---
+Private list: everything left on my side depends on the two subagent reports (standards checklist; venue policies + 2025–26 scan + Tian CVPR 2018 verification). Nothing independent remains to request — dblp and the Google Research page are unreachable, so those four venues will be flagged as "recalled, arXiv-verified, index not reachable". Waiting for the subagents to complete before assembling the deliverable.
+
+---
+
+## Sources visited / searched (in order)
+- WebSearch: Musgrave Belongie Lim "A Metric Learning Reality Check" ECCV 2020
+- WebSearch: Recht Roelofs Schmidt Shankar "Do ImageNet Classifiers Generalize to ImageNet?" ICML 2019 PMLR
+- WebSearch: Dacrema Cremonesi Jannach "Are We Really Making Much Progress? A Worrying Analysis of Recent Neural Recommendation Approaches" RecSys 2019 doi
+- WebSearch: Luo Gu Liao Lai Jiang "Bag of Tricks and a Strong Baseline for Deep Person Re-identification" CVPR Workshops 2019 IEEE Transactions on Multimedia
+- WebSearch: Geirhos "Shortcut learning in deep neural networks" Nature Machine Intelligence 2020 doi 10.1038/s42256-020-00257-z
+- WebSearch: D'Amour "Underspecification Presents Challenges for Credibility in Modern Machine Learning" JMLR 2022 volume 23
+- WebSearch: Li Johansen Ahmed Yeung Spampinato "Perils and Pitfalls of Block Design for EEG Classification Experiments" IEEE TPAMI
+- WebSearch: Wen Thibeau-Sutre "Convolutional neural networks for classification of Alzheimer's disease: Overview and reproducible evaluation" Medical Image Analysis 2020 data leakage
+- WebSearch: Roberts Driggs "Common pitfalls and recommendations for using machine learning to detect and prognosticate for COVID-19 using chest radiographs and CT scans" Nature Machine Intelligence 2021
+- WebSearch: Fan Liang Yu Huang "OpenGait: Revisiting Gait Recognition Towards Better Practicality" CVPR 2023
+- WebSearch: gait recognition CASIA-B evaluation protocol flaw critique identity overlap inflated accuracy paper
+- WebSearch: Agarwal Schwarzer Castro Courville Bellemare "Deep Reinforcement Learning at the Edge of the Statistical Precipice" NeurIPS 2021 outstanding paper
+- WebSearch: Henderson Islam Bachman Pineau Precup Meger "Deep Reinforcement Learning that Matters" AAAI 2018
+- WebSearch: Zech Badgeley Liu Costa Titano Oermann "Variable generalization performance of a deep learning model to detect pneumonia in chest radiographs" PLOS Medicine 2018
+- WebSearch: DeGrave Janizek Lee "AI for radiographic COVID-19 detection selects shortcuts over signal" Nature Machine Intelligence 2021
+- WebFetch: https://arxiv.org/abs/2003.08505
+- WebFetch: https://arxiv.org/abs/1907.06902
+- WebFetch: https://openaccess.thecvf.com/content/CVPR2023/html/Fan_OpenGait_Revisiting_Gait_Recognition_Towards_Better_Practicality_CVPR_2023_paper.html
+- WebFetch: https://arxiv.org/abs/1812.07697
+- WebFetch: https://www.cell.com/patterns/fulltext/S2666-3899(23)00159-9
+- WebSearch: Gorman Bedrick "We Need to Talk about Standard Splits" ACL 2019
+- WebSearch: Melis Dyer Blunsom "On the State of the Art of Evaluation in Neural Language Models" ICLR 2018
+- WebSearch: Lucic Kurach Michalski Gelly Bousquet "Are GANs Created Equal? A Large-Scale Study" NeurIPS 2018
+- WebSearch: Bouthillier Laurent Vincent "Unreproducible Research is Reproducible" ICML 2019
+- WebSearch: Sculley Snoek Wiltschko Rahimi "Winner's Curse? On Pace, Progress, and Empirical Rigor" ICLR 2018 workshop
+- WebSearch: Lipton Steinhardt "Troubling Trends in Machine Learning Scholarship" ACM Queue 2019
+- WebSearch: Peng Mathur Narayanan "Mitigating dataset harms requires stewardship: Lessons from 1000 papers" NeurIPS 2021 DukeMTMC MS-Celeb
+- WebSearch: "Identity Overlap Between Face Recognition Train/Test Data" optimistic bias 2024 Bowyer
+- WebSearch: "Information Leakage in Performance Evaluation of Pressure-Based Gait Biometric Recognition Systems" 2022 IEEE
+- WebSearch: Chekroud "Illusory generalizability of clinical prediction models" Science 2024 schizophrenia antipsychotic
+- WebSearch: Ahmed Wilbur Bharadwaj Siskind "Object classification from randomized EEG trials" CVPR 2021 "Confounds in the data" TPAMI
+- WebSearch: Rohrer "Putting the Self in Self-Correction: Findings From the Loss-of-Confidence Project" Perspectives on Psychological Science 2021
+- WebSearch: Wallach Heifets "Most Ligand-Based Classification Benchmarks Reward Memorization Rather than Generalization" Journal of Chemical Information and Modeling 2018
+- WebSearch: Zhu Guo "Gait Recognition in the Wild: A Benchmark" ICCV 2021 GREW indoor methods degrade in the wild
+- WebSearch: gait recognition models rely on body shape not motion shortcut learning silhouette study 2024 2025
+- WebSearch: Karianakis Liu Chen Soatto "Reinforced Temporal Attention and Split-Rate Transfer for Depth-Based Person Re-Identification" ECCV 2018; Haque Alahi Fei-Fei "Recurrent Attention Models for Depth-Based P
+- WebSearch: Munaro Basso Fossati Van Gool Menegatti BIWI RGBD-ID dataset 50 training videos 28 people "Still" "Walking" one-shot person re-identification consumer depth camera
+- WebSearch: Liciotti Paolanti Frontoni Mancini Zingaretti TVPR dataset "top-view" RGB-D person re-identification 100 people ICPR 2016 workshop
+- WebSearch: Ryoo Rothrock Fleming Yang "Privacy-Preserving Human Activity Recognition from Extreme Low Resolution" AAAI 2017; Wu Wang Wang Jin "Towards Privacy-Preserving Visual Recognition via Adversarial Traini
+- WebSearch: Whalen Schreiber Noble Pollard "Navigating the pitfalls of applying machine learning in genomics" Nature Reviews Genetics 2022
+- WebSearch: Ferrari Dacrema Boglio Cremonesi Jannach "A Troubling Analysis of Reproducibility and Progress in Recommender Systems Research" ACM TOIS 2021 doi
+- WebSearch: Jia Ruan Hospedales "Frustratingly Easy Person Re-Identification: Generalizing Person Re-ID in Practice" BMVC 2019
+- WebSearch: Zhang Bengio Hardt Recht Vinyals "Understanding deep learning requires rethinking generalization" ICLR 2017 random labels Communications of the ACM 2021
+- WebSearch: Raji Fried "About Face: A Survey of Facial Recognition Evaluation" 2021 venue; Buolamwini Gebru "Gender Shades" FAT* 2018 PMLR 81
+- WebFetch: https://aclanthology.org/P19-1267/
+- WebFetch: https://arxiv.org/abs/1707.05589
+- WebFetch: https://arxiv.org/abs/1711.10337
+- WebFetch: https://proceedings.mlr.press/v97/bouthillier19a.html
+- WebFetch: https://openreview.net/forum?id=rJWF0Fywf
+- WebFetch: https://queue.acm.org/detail.cfm?id=3317287
+- WebFetch: https://arxiv.org/abs/2108.02922
+- WebFetch: https://arxiv.org/abs/2405.09403
+- WebFetch: https://arxiv.org/abs/2004.06046
+- WebFetch: https://arxiv.org/abs/1706.06619
+- WebFetch: https://arxiv.org/abs/2205.02692
+- WebFetch: https://arxiv.org/abs/1705.09882
+- WebFetch: https://arxiv.org/abs/1604.03196
+- WebFetch: https://arxiv.org/abs/1807.08379
+- WebFetch: https://arxiv.org/abs/1905.03422
+- WebFetch: https://arxiv.org/abs/1611.03530
+- WebFetch: https://arxiv.org/abs/2103.14749
+- WebFetch: https://arxiv.org/abs/2102.00813
+- WebFetch: https://arxiv.org/abs/2211.06597
+- WebFetch: https://arxiv.org/abs/2207.07048
+- WebFetch: https://arxiv.org/abs/2607.12278
+- WebFetch: https://arxiv.org/abs/2602.17854
+- WebFetch: https://arxiv.org/abs/2604.14161
+- WebFetch: https://arxiv.org/abs/2505.15176
+- WebFetch: https://www.nature.com/articles/s41576-021-00434-9
+- WebFetch: https://www.nature.com/articles/s41598-021-01681-w
+- WebFetch: https://www.mdpi.com/2075-4418/15/18/2348
+- WebFetch: https://link.springer.com/chapter/10.1007/978-1-4471-6296-4_8
+- WebFetch: https://link.springer.com/chapter/10.1007/978-3-319-56687-0_1
+- WebFetch: https://proceedings.mlr.press/v81/buolamwini18a.html
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1126/science.adg8538?fields=title,authors,venue,year,citationCount,abstract
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1177/1745691620964106?fields=title,authors,venue,year,citationCount,abstract
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1145/3434185?fields=title,authors,venue,year,citationCount,abstract
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Information+Leakage+in+Performance+Evaluation+of+Pressure-Based+Gait+Biometric+Recognition+Systems&fields=title,authors,venue,year,externalI
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Recurrent+Attention+Models+for+Depth-Based+Person+Identification&fields=title,authors,venue,year,externalIds,citationCount,abstract&limit=3
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1145/3630106.3658983?fields=title,authors,venue,year,citationCount,abstract
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1145/2382577.2382579?fields=title,authors,venue,year,citationCount,abstract
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Unbiased+look+at+dataset+bias+Torralba+Efros&fields=title,authors,venue,year,externalIds,citationCount&limit=3
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Eliminating+Background-bias+for+Robust+Person+Re-identification&fields=title,authors,venue,year,externalIds,citationCount,abstract&limit=3
+- WebFetch: https://idp.nature.com/authorize?response_type=cookie&client_id=grover&redirect_uri=https%3A%2F%2Fwww.nature.com%2Farticles%2Fs41576-021-00434-9
+- WebFetch: https://idp.nature.com/authorize?response_type=cookie&client_id=grover&redirect_uri=https%3A%2F%2Fwww.nature.com%2Farticles%2Fs41598-021-01681-w
+- WebFetch: https://idp.springer.com/authorize?response_type=cookie&client_id=springerlink&redirect_uri=https%3A%2F%2Flink.springer.com%2Fchapter%2F10.1007%2F978-1-4471-6296-4_8
+- WebFetch: https://idp.springer.com/authorize?response_type=cookie&client_id=springerlink&redirect_uri=https%3A%2F%2Flink.springer.com%2Fchapter%2F10.1007%2F978-3-319-56687-0_1
+- WebFetch: https://arxiv.org/abs/1807.03341
+- WebFetch: https://arxiv.org/abs/2106.03253
+- WebFetch: https://arxiv.org/abs/2106.11959
+- WebFetch: https://arxiv.org/abs/2607.07769
+- WebFetch: https://pubmed.ncbi.nlm.nih.gov/?term=10.1016%2Fj.patter.2023.100804
+- WebFetch: https://pubmed.ncbi.nlm.nih.gov/?term=10.3390%2Fdiagnostics15182348
+- WebFetch: https://pubmed.ncbi.nlm.nih.gov/?term=%22One+neuron+versus+deep+learning+in+aftershock+prediction%22
+- WebFetch: https://dblp.org/search/publ/api?q=On%20the%20State%20of%20the%20Art%20of%20Evaluation%20in%20Neural%20Language%20Models&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Reinforced%20Temporal%20Attention%20and%20Split-Rate%20Transfer%20for%20Depth-Based%20Person%20Re-Identification&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Recurrent%20Attention%20Models%20for%20Depth-Based%20Person%20Identification&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Object%20classification%20from%20randomized%20EEG%20trials&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Confounds%20in%20the%20Data%20Comments%20on%20Decoding%20Brain%20Representations&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Mitigating%20Dataset%20Harms%20Requires%20Stewardship%20Lessons%20from%201000%20Papers&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Gait%20Recognition%20in%20the%20Wild%20A%20Benchmark&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Leakage%20in%20data%20mining%20Formulation%20detection%20and%20avoidance&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Unbiased%20look%20at%20dataset%20bias&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Identity%20Overlap%20Between%20Face%20Recognition%20Train%20Test%20Data&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=A%20Troubling%20Analysis%20of%20Reproducibility%20and%20Progress%20in%20Recommender%20Systems%20Research&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Winner%27s%20Curse%20On%20Pace%20Progress%20and%20Empirical%20Rigor&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Frustratingly%20Easy%20Person%20Re-Identification%20Generalizing%20Person%20Re-ID%20in%20Practice&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=One-Shot%20Person%20Re-identification%20with%20a%20Consumer%20Depth%20Camera&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Person%20Re-identification%20Dataset%20with%20RGB-D%20Camera%20in%20a%20Top-View%20Configuration&format=json&h=5
+- WebFetch: http://export.arxiv.org/api/query?search_query=abs:%22subject-level%22%20AND%20abs:%22leakage%22%20AND%20(abs:%22identification%22%20OR%20abs:%22biometric%22%20OR%20abs:%22recognition%22)&sortBy=submi
+- WebFetch: http://export.arxiv.org/api/query?search_query=abs:%22frame-level%22%20AND%20abs:%22split%22%20AND%20abs:%22leakage%22&sortBy=submittedDate&sortOrder=descending&max_results=25
+- WebFetch: https://www.nature.com/articles/s41576-021-00434-9?error=cookies_not_supported&code=2a8a6776-750c-41cd-8127-d1a6551f2ef7
+- WebFetch: https://www.nature.com/articles/s41598-021-01681-w?error=cookies_not_supported&code=a26ca569-b495-4dc5-8ba3-14f05c60a6eb
+- WebFetch: https://link.springer.com/chapter/10.1007/978-1-4471-6296-4_8?error=cookies_not_supported&code=2a138ef7-535a-4caa-b4d6-3c8aaba04bb8
+- WebFetch: https://link.springer.com/chapter/10.1007/978-3-319-56687-0_1?error=cookies_not_supported&code=b2128402-c748-4006-a98b-b4dca9514dd6
+- WebFetch: https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1016/j.patter.2023.100804&format=json&resultType=core
+- WebFetch: https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.3390/diagnostics15182348&format=json&resultType=core
+- WebFetch: https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1038/s41598-021-01681-w&format=json&resultType=core
+- WebFetch: https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=DOI:10.1038/s41576-021-00434-9&format=json&resultType=core
+- WebFetch: https://api.crossref.org/works/10.1145/3434185
+- WebFetch: https://api.crossref.org/works/10.1177/1745691620964106
+- WebFetch: https://api.crossref.org/works/10.1145/2382577.2382579
+- WebFetch: https://api.crossref.org/works/10.1109/CVPR.2011.5995347
+- WebFetch: https://api.crossref.org/works/10.1145/3317287.3328534
+- WebFetch: https://api.crossref.org/works/10.1007/978-1-4471-6296-4_8
+- WebFetch: https://api.crossref.org/works/10.1007/978-3-319-56687-0_1
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Reinforced+Temporal+Attention+and+Split-Rate+Transfer+for+Depth-Based+Person+Re-Identification&rows=3
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Recurrent+Attention+Models+for+Depth-Based+Person+Identification+Haque+Alahi+Fei-Fei&rows=3
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Object+classification+from+randomized+EEG+trials+Ahmed+Wilbur+Bharadwaj+Siskind&rows=3
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Confounds+in+the+Data+Comments+on+Decoding+Brain+Representations+by+Multimodal+Learning+of+Neural+Activity+and+Visual+Features&rows=3
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Gait+Recognition+in+the+Wild+A+Benchmark+Zhu+Guo+Yang+ICCV+2021&rows=3
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Identity+Overlap+Between+Face+Recognition+Train+Test+Data+Causing+Optimistic+Bias+in+Accuracy+Measurement&rows=3
+- WebFetch: https://arxiv.org/pdf/2003.08505v3
+- WebFetch: http://robotics.dei.unipd.it/reid/index.php/downloads
+- WebFetch: https://www.cv-foundation.org/openaccess/content_cvpr_2016/html/Haque_Recurrent_Attention_Models_CVPR_2016_paper.html
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Winner%27s+Curse+On+Pace+Progress+and+Empirical+Rigor+Sculley&fields=title,authors,venue,year,externalIds&limit=3
+- WebFetch: https://arxiv.org/pdf/1705.09882v3
+- WebFetch: https://api.openreview.net/notes?id=rJWF0Fywf
+- WebFetch: http://robotics.dei.unipd.it/reid/
+- WebFetch: https://arxiv.org/pdf/1705.09882
+- WebFetch: https://www.cv-foundation.org/openaccess/content_cvpr_2016/papers/Haque_Recurrent_Attention_Models_CVPR_2016_paper.pdf
+- WebFetch: https://arxiv.org/pdf/1703.09474
+- WebFetch: https://dblp.org/search/publ/api?q=On+the+State+of+the+Art+of+Evaluation+in+Neural+Language+Models&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Mitigating+Dataset+Harms+Requires+Stewardship&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Frustratingly+Easy+Person+Re-Identification&format=json&h=5
+- WebFetch: https://dblp.org/search/publ/api?q=Eliminating+Background-bias+for+Robust+Person+Re-identification&format=json&h=5
+- WebFetch: https://research.google/pubs/winners-curse-on-pace-progress-and-empirical-rigor/

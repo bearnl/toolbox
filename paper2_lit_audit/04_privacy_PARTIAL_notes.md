@@ -1,0 +1,116 @@
+# 04_privacy — partial working notes recovered from the killed transcript
+(assistant-side text only; 1 blocks, 107 web actions)
+
+## Notes
+I'll start by loading the web research tools, then work through the four audit areas systematically.
+
+---
+
+## Sources visited / searched (in order)
+- WebSearch: Mucha Kampel "Addressing Privacy Concerns in Depth Sensors" ICCHP 2022
+- WebSearch: Mucha Kampel "Beyond Privacy of Depth Sensors" PETRA 2022 ambient assisted living face recognition depth
+- WebSearch: Haque Alahi Fei-Fei "Recurrent Attention Models for Depth-Based Person Identification" CVPR 2016
+- WebSearch: depth-based person re-identification privacy "depth" "re-identification" body shape Kinect cross-session 2023 2024
+- WebSearch: "depth" images "privacy" person identification "not anonymous" OR "not privacy-preserving" 2024 2025 arXiv
+- WebSearch: anonymization of depth images privacy-preserving depth data de-identification body shape 2021 2022 2023
+- WebFetch: https://dl.acm.org/doi/fullHtml/10.1145/3529190.3534764
+- WebFetch: https://link.springer.com/chapter/10.1007/978-3-031-08645-8_62
+- WebFetch: https://arxiv.org/abs/1611.07212
+- WebFetch: https://arxiv.org/abs/2605.04977
+- WebFetch: https://arxiv.org/abs/2606.23230
+- WebFetch: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12788357/
+- WebSearch: Mucha Kampel 2023 OR 2024 OR 2025 depth privacy faces "depth" AAL identification VisuAAL privacy-preserving depth sensor evaluation
+- WebSearch: gait anonymization silhouette de-identification "gait" identity leaks blurring body "de-identification" video Agrawal Narayanan 2011 OR Hirose 2021 OR Tieu 2019
+- WebSearch: low-resolution depth OR "time-of-flight" 8x8 OR 64-pixel person identification privacy-preserving fall detection identification accuracy
+- WebSearch: Kinect depth person identification accuracy 99% OR 98% CNN "depth images" identification random split frames evaluation
+- WebSearch: body shape uniqueness identification anthropometric "how unique" OR "k-anonymity" OR "re-identification risk" 3D body scan CAESAR biometric
+- WebSearch: depth face recognition Kinect "Lock3DFace" OR "KinectFaceDB" OR "Led3D" low-quality depth face recognition accuracy
+- WebSearch: "random split" OR "frame-level split" data leakage person identification gait OR skeleton OR depth inflated accuracy subject-disjoint session-disjoint evaluation
+- WebSearch: 2025 OR 2026 depth camera person identification privacy "depth" "identif" care home OR hospital OR bathroom body shape arXiv
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1145/3529190.3534764?fields=title,abstract,authors,year,venue,externalIds,citationCount,citations.title,citations.year,citations.authors,citations
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1007/978-3-031-08645-8_62?fields=title,abstract,authors,year,venue,externalIds,citationCount,citations.title,citations.year,citations.authors,cita
+- WebFetch: http://vision.stanford.edu/pdf/haque2016cvpr.pdf
+- WebFetch: https://pmc.ncbi.nlm.nih.gov/articles/PMC12788357/
+- WebFetch: https://arxiv.org/abs/2304.01635
+- WebFetch: https://arxiv.org/abs/2507.13981
+- WebFetch: https://www.nature.com/articles/s41586-020-2669-y
+- WebFetch: https://arxiv.org/abs/1609.00408
+- WebSearch: Dubois Charpillet "person identification" gait depth camera home EMBC 2014 Kinect identification accuracy
+- WebSearch: TUM-GAID depth gait recognition "temporal" OR "elapsed time" OR "cross-session" 32 subjects January April depth-only accuracy Hofmann
+- WebSearch: Oh Benenson Fritz Schiele "Faceless Person Recognition" ECCV 2016 privacy implications body cues obfuscation
+- WebSearch: Korshunov Ebrahimi privacy filters subjective objective evaluation face recognition blurring pixelation "privacy protection" surveillance PEViD
+- WebSearch: Padilla-López Chaaraoui Flórez-Revuelta "Visual privacy protection methods: A survey" silhouette skeleton privacy levels AAL
+- WebSearch: Liciotti Paolanti Frontoni top-view RGB-D person re-identification TVPR dataset privacy "top-view" Sensors 2018
+- WebSearch: Srivastav Gangi Padoy "low-resolution depth images" privacy operating room human pose estimation MICCAI 2019 OR 2018 identification
+- WebSearch: "privacy-preserving" sensing "misnomer" OR "false sense of privacy" OR "threat model" depth OR thermal OR radar sensor "not inherently" private identification machine learning
+- WebSearch: depth image quantization OR "bit depth" OR "coarse depth" privacy identification "depth resolution" reduce identifiability person recognition
+- WebFetch: https://openaccess.thecvf.com/content_cvpr_2016/papers/Haque_Recurrent_Attention_Models_CVPR_2016_paper.pdf
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1038/s41586-020-2669-y?fields=title,abstract,authors,year,venue,externalIds,tldr
+- WebFetch: https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=PMCID:PMC12788357&resultType=core&format=json
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=person+identification+gait+depth+camera+home+Dubois+Charpillet&fields=title,authors,year,venue,externalIds,abstract&limit=5
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=TUM-GAID+depth+gait+recognition+temporal+variation&fields=title,authors,year,venue,externalIds,abstract&limit=6
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=Faceless+Person+Recognition+Privacy+Implications+in+Social+Media&fields=title,authors,year,venue,externalIds,abstract&limit=3
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=privacy+filters+evaluation+face+recognition+blurring+pixelation+Korshunov+Ebrahimi&fields=title,authors,year,venue,externalIds,abstract&limi
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=visual+privacy+protection+methods+survey+Padilla-Lopez+Chaaraoui+Florez-Revuelta&fields=title,authors,year,venue,externalIds,abstract&limit=
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=top-view+RGB-D+camera+person+re-identification+TVPR+dataset&fields=title,authors,year,venue,externalIds,abstract&limit=6
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=low-resolution+depth+images+privacy+operating+room+human+pose+estimation+Srivastav+Padoy&fields=title,authors,year,venue,externalIds,abstrac
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=depth+image+privacy+identification+quantization+bit+depth+resolution+identifiability&fields=title,authors,year,venue,externalIds,abstract&li
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=silhouette+leaks+identity+person+masking+privacy+video+de-identification+gait&fields=title,authors,year,venue,externalIds,abstract&limit=8
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=person+identification+depth+images+body+shape+privacy+2025&fields=title,authors,year,venue,externalIds,abstract&limit=10&year=2024-2026
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/search?query=depth+sensor+privacy+preserving+myth+identification+risk+ambient+assisted+living+not+anonymous&fields=title,authors,year,venue,externalIds,a
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Individual+recognition+using+gait+energy+image+Han+Bhanu&rows=2&select=DOI,title,author,container-title,issued
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Human+identification+from+body+shape+Godil+Grother+Ressler&rows=2&select=DOI,title,author,container-title,issued
+- WebFetch: https://arxiv.org/pdf/1611.07212v1
+- WebFetch: https://r.jina.ai/https://www.nature.com/articles/s41586-020-2669-y
+- WebFetch: https://arxiv.org/abs/1607.08438
+- WebFetch: https://arxiv.org/abs/2007.08340
+- WebFetch: https://api.crossref.org/works/10.1016/j.jvcir.2013.02.006
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Person+identification+from+gait+analysis+with+a+depth+camera+at+home&rows=3&select=DOI,title,author,container-title,issued
+- WebFetch: https://api.crossref.org/works/10.1016/j.eswa.2015.01.041
+- WebFetch: https://api.crossref.org/works/10.1117/12.2027040
+- WebFetch: https://api.crossref.org/works/10.1093/gigascience/gix019
+- WebFetch: https://api.crossref.org/works/10.1109/WIFS.2017.8267657
+- WebFetch: https://api.crossref.org/works/10.1109/TIFS.2015.2480381
+- WebFetch: https://arxiv.org/abs/2305.19160
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1007/978-1-4471-6296-4_8?fields=title,abstract,authors,year,venue,externalIds
+- WebFetch: https://api.crossref.org/works/10.1109/TIP.2017.2675201
+- WebFetch: https://arxiv.org/abs/2609.01036
+- WebFetch: https://arxiv.org/abs/2608.04501
+- WebFetch: http://export.arxiv.org/api/query?search_query=all:depth+AND+all:privacy+AND+%28all:%22person+identification%22+OR+all:%22re-identification%22+OR+all:biometric%29&sortBy=submittedDate&sortOrder=descen
+- WebFetch: https://arxiv.org/abs/2605.12431
+- WebFetch: https://api.crossref.org/works/10.1007/s12652-024-04865-0
+- WebFetch: https://www.frontiersin.org/articles/10.3389/fpubh.2023.1186944/full
+- WebFetch: https://arxiv.org/html/2609.01036v1
+- WebFetch: https://arxiv.org/abs/2203.04179
+- WebFetch: https://api.semanticscholar.org/graph/v1/paper/DOI:10.1109/EMBC.2015.7319514?fields=title,abstract,authors,year,venue,externalIds,citationCount
+- WebFetch: https://api.openalex.org/works/doi:10.1145/3529190.3534764
+- WebFetch: https://api.openalex.org/works/doi:10.1007/978-3-031-08645-8_62
+- WebFetch: https://api.openalex.org/works/doi:10.1038/s41586-020-2669-y
+- WebFetch: https://api.crossref.org/works/10.1109/IJCB.2011.6117504
+- WebFetch: https://api.crossref.org/works/10.1109/TIFS.2014.2352114
+- WebFetch: https://api.crossref.org/works/10.1007/978-3-642-33863-2_43
+- WebFetch: https://api.crossref.org/works?query.bibliographic=Enhanced+skeleton+and+face+3D+data+for+person+re-identification+from+depth+cameras&rows=2&select=DOI,title,author,container-title,issued,abstract
+- WebFetch: https://api.crossref.org/works/10.1016/j.patter.2023.100804
+- WebFetch: https://api.openalex.org/works?search=%22person%20identification%22%20%22depth%20images%22%20kinect%20convolutional%20neural%20network&per-page=10&select=doi,title,publication_year,primary_location,ci
+- WebFetch: https://r.jina.ai/https://link.springer.com/chapter/10.1007/978-1-4471-6296-4_8
+- WebFetch: https://arxiv.org/abs/1708.00163
+- WebFetch: https://www.nature.com/articles/s41746-019-0087-z
+- WebFetch: https://api.archives-ouvertes.fr/search/?q=title_t:%22Person%20identification%20from%20gait%20analysis%20with%20a%20depth%20camera%20at%20home%22&fl=title_s,abstract_s,doiId_s,uri_s,authFullName_s,pro
+- WebFetch: https://api.openalex.org/works/doi:10.1016/j.jvcir.2013.02.006
+- WebFetch: https://api.openalex.org/works/doi:10.1007/s10209-023-01070-2
+- WebFetch: https://api.crossref.org/works/10.1109/TPAMI.2021.3057879
+- WebFetch: https://r.jina.ai/https://ieeexplore.ieee.org/document/7319514
+- WebFetch: https://r.jina.ai/https://dl.acm.org/doi/fullHtml/10.1145/3529190.3534764
+- WebFetch: https://r.jina.ai/https://www.mmk.ei.tum.de/tumgaid/
+- WebFetch: https://r.jina.ai/https://opus.bibliothek.uni-augsburg.de/opus4/frontdoor/index/index/docId/72583
+- WebFetch: https://api.crossref.org/works/10.1016/j.eswa.2026.133943
+- WebFetch: https://api.crossref.org/works/10.1109/PerComWorkshops59983.2024.10503526
+- WebFetch: https://api.crossref.org/works/10.1007/978-3-030-01228-1_44
+- WebFetch: http://export.arxiv.org/api/query?search_query=%28au:Todt_J+OR+au:Hanisch_S+OR+au:Strufe_T%29+AND+%28all:gait+OR+all:biometric+OR+all:anonymization+OR+all:depth+OR+all:thermal%29&sortBy=submittedDate&
+- WebFetch: https://arxiv.org/abs/2605.06359
+- WebFetch: https://eur-lex.europa.eu/legal-content/EN/TXT/HTML/?uri=CELEX:32016R0679
+- WebFetch: https://arxiv.org/html/2609.01036v1
+- WebFetch: https://r.jina.ai/http://robotics.dei.unipd.it/reid/index.php/downloads
+- WebFetch: https://api.crossref.org/works/10.1109/TPAMI.2008.291
+- WebFetch: https://api.crossref.org/works/10.1109/TCSVT.2003.818349
+- WebFetch: https://arxiv.org/abs/2409.02715

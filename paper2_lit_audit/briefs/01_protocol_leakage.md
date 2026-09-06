@@ -1,0 +1,6 @@
+SHARED CONTEXT: see 00_shared_context.md
+
+AUDIT C1 -- the evaluation ladder / protocol leakage.
+Be adversarial: find prior work that PRE-EMPTS or weakens C1; state what it can still claim. Every item: citation (authors, title, venue, year, DOI/URL) + one line on what it DID (data, protocol, numbers); short quotes only.
+FIND: (1) person ID / re-ID / gait / face-from-video critiques of frame-random or same-session splits with quantified inflation; (2) other domains formalising the leak: record-wise vs subject-wise CV (Saeb 2017, Little 2017), patient-level leakage, deepfake/video frame duplicates, EEG cross-session, blocked/purged CV (de Prado; Roberts et al. 2017), Kapoor & Narayanan 2023; (3) anyone who ALREADY did a guard-band / temporal-gap sweep at matched training size, or a trivial-cue (bbox/position) floor -- most important finding if it exists; (4) depth-specific: papers reporting both frame-random and session-disjoint numbers on the same data (Munaro 2014, Wu TIP 2017, Karianakis ECCV 2018, Hafner, Liu Sensors 2025, 2023-2026 depth/LiDAR ID).
+DELIVER: A ranked list (max 12): citation | what they did | PRE-EMPTS/PARTIAL/NONE + reason. B what C1 can still claim (3-6 bullets) and must not claim (2-3). C positioning sentences vs the closest works. D anything 2025-2026. Mark unverified facts.

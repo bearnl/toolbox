@@ -2761,3 +2761,21 @@ then re-render fig 8 from the 12-draw `cohort.json` and archive off scratch
 disappear — §14.3), with the SHA line in `ARCHIVE_MANIFEST.txt`. Remaining:
 the dropcorr correlation re-run (seconds) and fig 8 from the 12-draw JSON.
 After that the campaign is closed; what remains is the manuscript (§11.3).
+
+### 14.7 Literature audit — state saved 2026-09-06 (session handed to Opus 5)
+
+Before the rewrite the author asked for a full online audit that the contributions are
+journal-level. Five adversarial audits were launched; the session had to be stopped
+mid-way. **Everything is saved in `paper2_lit_audit/` (this repo: briefs, the two
+COMPLETE reports, partial notes with every source visited, README_HANDOFF.md with
+resume instructions) and, for the bulky raw material, in
+`/Volumes/Workspace/study/hiride2-results/lit-audit/` (transcripts/, extracts/ with the
+fetched PDFs).** Completed: C2 attribution audit (survives, narrowed — background
+ablations and "depth is clothing-invariant" are prior art; the inpainted exact
+complement in depth along the ladder, the 16→1-bit Z-precision axis, and the
+person-borne RGB loss remain ours; "outline not 3D shape" must be scoped, LidarGait
+2023 contradicts it at fixed encoder) and the venue-fit audit (PoPETs best fit; T-BIOM
+second; TOPS excludes biometrics; IEEE T-Privacy not yet assessed). Newest instance
+of the rebutted claim: Delécluse et al. arXiv:2606.23230 (June 2026), depth-only
+transformer 60.7 % rank-1 on BIWI, "inherently preserves privacy". Next: relaunch
+audits 01/03/04/05, then write the ESSENCE for the author's approval, then rewrite.

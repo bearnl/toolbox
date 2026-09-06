@@ -1,0 +1,84 @@
+# 01_protocol — partial working notes recovered from the killed transcript
+(assistant-side text only; 1 blocks, 75 web actions)
+
+## Notes
+I'll load the web research tools and begin the search.
+
+---
+
+## Sources visited / searched (in order)
+- WebSearch: "temporal leakage" OR "temporal leak" video frames person re-identification random frame split inflated accuracy
+- WebSearch: Saeb Lonini Jayaraman Mohr Kording 2017 "record-wise" "subject-wise" cross-validation GigaScience
+- WebSearch: Kapoor Narayanan 2023 "Leakage and the reproducibility crisis" Patterns temporal leakage taxonomy
+- WebSearch: Roberts 2017 "Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure" Ecography blocked cross-validation
+- WebSearch: Munaro Fossati Basso Menegatti Van Gool 2014 "One-shot person re-identification with a consumer depth camera" BIWI RGBD-ID
+- WebSearch: Wu Zheng Lai 2017 "Robust Depth-based Person Re-identification" IEEE TIP BIWI results
+- WebSearch: Karianakis Liu Chen Soatto 2018 "Reinforced Temporal Attention and Split-Rate Transfer for Depth-Based Person Re-Identification" ECCV
+- WebSearch: TVRID top-view person re-identification RealSense D455 depth dataset 88
+- WebFetch: https://arxiv.org/abs/2511.13944
+- WebFetch: https://arxiv.org/abs/2606.23230
+- WebFetch: https://arxiv.org/html/2605.04977
+- WebSearch: Haque Alahi Fei-Fei 2016 "Recurrent Attention Models for Depth-Based Person Identification" DPI-T dataset different days clothing BIWI results
+- WebSearch: Sarkar Phillips Liu Vega Grother Bowyer 2005 HumanID gait challenge time covariate elapsed time rank-1 drop experiment
+- WebSearch: Hammerla Plötz 2015 "Let's (not) stick together" pairwise similarity biases cross-validation activity recognition UbiComp
+- WebSearch: Racine 2000 "hv-block cross-validation" dependent data gap; de Prado purged k-fold "embargo"; Bergmeir Benítez 2012 blocked cross-validation time series
+- WebSearch: Li Johansen Ahmed Shah Siskind "perils and pitfalls of block design for EEG classification experiments" TPAMI temporal correlation
+- WebSearch: Tian Yi Li Duan Wang 2018 "Eliminating Background-bias for Robust Person Re-identification" CVPR background-only accuracy Market-1501
+- WebSearch: SeaTurtleID2022 "time-aware" split random split overestimates re-identification WACV 2024 Adam Čermák
+- WebSearch: deepfake detection frame-level split video-level split data leakage inflated accuracy same video frames train test
+- WebSearch: Sensors 2025 person identification infrared LiDAR depth "six subjects" OR "6 subjects" privacy-preserving deep learning Liu
+- WebFetch: https://arxiv.org/html/2511.13944
+- WebFetch: https://www.mdpi.com/1424-8220/25/1/271
+- WebFetch: https://arxiv.org/abs/2211.10307
+- WebFetch: https://www.researchgate.net/publication/311488859_Let's_not_stick_together_pairwise_similarity_biases_cross-validation_in_activity_recognition
+- WebFetch: https://engineering.purdue.edu/~qobi/papers/tpami2021.pdf
+- WebFetch: https://openaccess.thecvf.com/content_cvpr_2018/papers/Tian_Eliminating_Background-Bias_for_CVPR_2018_paper.pdf
+- WebFetch: https://pubmed.ncbi.nlm.nih.gov/15688555/
+- WebSearch: Matovski Nixon Mahmoodi Carter 2012 "The effect of time on gait recognition performance" IEEE TIFS correct classification rate same day different day
+- WebFetch: https://robotics.dei.unipd.it/reid/index.php/downloads
+- WebFetch: https://arxiv.org/pdf/1703.09474
+- WebFetch: https://arxiv.org/pdf/1705.09882
+- WebFetch: http://vision.stanford.edu/pdf/haque2016cvpr.pdf
+- WebFetch: https://arxiv.org/pdf/1810.11641
+- WebFetch: https://arxiv.org/abs/2207.07048
+- WebSearch: Pohjankukka Pahikkala Nevalainen Heikkonen 2017 "spatial k-fold cross validation" dead zone radius buffer overestimation prediction performance
+- WebSearch: Yagis 2021 "Effect of data leakage in brain MRI classification using 2D convolutional neural networks" Scientific Reports slice-level subject-level accuracy
+- WebSearch: Tampu Eklund Haj-Hosseini 2022 "Inflation of test accuracy due to data leakage in deep learning-based classification of OCT images" Scientific Data
+- WebSearch: Bussola Marcolini Maggio Jurman Furlanello 2021 "AI slipping on tiles: data leakage in digital pathology" tile-level patient-level
+- WebSearch: Wen 2020 "Convolutional neural networks for classification of Alzheimer's disease: Overview and reproducible evaluation" data leakage slice-level split Medical Image Analysis
+- WebSearch: Beery Van Horn Perona 2018 "Recognition in Terra Incognita" cis-location trans-location camera trap near-duplicate sequences
+- WebSearch: He Doi Hattori Hoshi Mori Fukui 2016 "Human Action Recognition without Human" ECCV workshop background only
+- WebSearch: Dong 2023 "Implicit Identity Leakage: The Stumbling Block to Improving Deepfake Detection Generalization" CVPR
+- WebSearch: Soomro Zamir Shah 2012 UCF101 "groups" clips same group train test split "share some common features" leakage
+- WebSearch: Ojala Garriga 2010 "Permutation tests for studying classifier performance" JMLR; Combrisson Jerbi 2015 "Exceeding chance level by chance"
+- WebSearch: depth-only person identification privacy "Azure Kinect" OR "depth camera" cross-session OR "different day" accuracy drop 2024 OR 2025 OR 2026
+- WebSearch: LiDAR person re-identification LReID 2024 CVPR "LiDAR-based Person Re-identification" protocol train test split identities
+- WebSearch: Paolanti Liciotti Frontoni TVPR top-view RGB-D re-identification 100 people accuracy kNN neighborhood component 2018 Sensors results
+- WebSearch: person re-identification shortcut "bounding box" size position camera cue trivial baseline identity leakage dataset bias
+- WebFetch: https://openaccess.thecvf.com/content_cvpr_2016/papers/Haque_Recurrent_Attention_Models_CVPR_2016_paper.pdf
+- WebFetch: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC6210929/
+- WebFetch: https://link.springer.com/chapter/10.1007/978-3-319-56687-0_1
+- WebFetch: https://arxiv.org/pdf/2606.23230
+- WebFetch: https://core.ac.uk/download/pdf/1511595.pdf
+- WebFetch: https://hbiostat.org/papers/kap23lea.pdf
+- WebFetch: https://arxiv.org/pdf/2211.10307
+- WebFetch: https://eprints.ncl.ac.uk/pub_details2.aspx?pub_id=216590
+- WebFetch: https://openaccess.thecvf.com/content_cvpr_2018/html/Tian_Eliminating_Background-Bias_for_CVPR_2018_paper.html
+- WebFetch: https://link.springer.com/chapter/10.1007/978-1-4471-6296-4_8
+- WebSearch: "Human Action Recognition without Human" Kataoka Satoh ECCV 2016 workshop background-only classification UCF101 accuracy
+- WebSearch: "A Comparison Study of Person Identification Using IR Array Sensors and LiDAR" Sensors 2025 subjects train test split accuracy
+- WebSearch: BIWI RGBD-ID dataset "Still" "Walking" testing videos "different day" clothes 28 people 50 training Munaro
+- WebSearch: "temporal gap" OR "temporal buffer" OR "guard band" OR "embargo" between training and test frames video classification leakage accuracy as function of gap sweep
+- WebSearch: "frame-level" split "video-level" split leakage inflated accuracy "same video" train test classification study near-duplicate frames -deepfake
+- WebSearch: deepfake detection "frame-level" versus "video-level" split "same video" frames in training and test overestimated accuracy FaceForensics++ leakage study
+- WebSearch: Kinect gait recognition identification "different days" OR "cross-day" OR "cross-session" accuracy drop same-day evaluation skeleton depth
+- WebSearch: Dehghani Sarbishei Glatard Shihab 2019 "overlapping and non-overlapping sliding windows" human activity recognition Sensors leakage inflated accuracy
+- WebSearch: Maiorana Campisi 2018 "Longitudinal evaluation of EEG-based biometric recognition" TIFS cross-session same-session accuracy
+- WebSearch: GODPR dataset top-view RGB-D person re-identification TVPR2 dataset Delécluse Wannous
+- WebSearch: LReID LiDAR person re-identification dataset "identities" training testing split scenes Guo Wang 2024 rank-1 94.0 protocol
+- WebSearch: arxiv 2025 2026 depth OR LiDAR OR "point cloud" person identification OR re-identification "privacy" evaluation protocol "frame" leakage OR "same session" OR "cross-session"
+- WebFetch: https://pmc.ncbi.nlm.nih.gov/articles/PMC6210929/
+- WebFetch: https://arxiv.org/html/2312.03033v2
+- WebFetch: https://www.crcv.ucf.edu/data/UCF101.php
+- WebFetch: https://arxiv.org/html/2605.04977
+- WebFetch: https://raw.githubusercontent.com/RaphaelDel/ICPR-2026-TVRID/main/README.md
