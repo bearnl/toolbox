@@ -2713,10 +2713,35 @@ Measured 2026-09-06 (adjacent / random-pair median |Δdepth|, mm → ratio): leo
 45.1/163.0 → **0.277**; bear 53.6/155.9 → 0.344; stephen 187.1/393.6 → 0.475;
 ranyi 0.565; lirunze 0.569; xiaoyu 0.641; man2 0.757; lady2 0.835; man1 0.849;
 lady1 **0.892**. BIWI aggregate reference: ratio 0.38, mean per-subject R0→R1
-drop +38.2 pp over 50 subjects. The per-identity correlation itself is pending
-one re-run: the first pass matched zero in-house cells because wave 8's result
-files predate the trainer recording `eligibility` (key `full`, not `full/all`)
-— fixed in the matcher.
+drop +38.2 pp over 50 subjects. **The per-identity prediction is REFUTED, for a legible reason
+(2026-09-06).** Predicted: NEGATIVE correlation (less duplication → smaller
+R0→R1 drop). Measured over the 10 in-house identities, per-subject accuracy
+from the stored predictions (5 seeds/cell): **Spearman ρ = +0.64 (depth),
++0.78 (RGB)** — the wrong sign, and strongly so. The rows say why:
+
+| identity (room) | ratio | depth R0 → R1 | rgb R0 → R1 |
+|---|---|---|---|
+| leo (alone in leo-recording) | 0.28 | 100 → 100 | 100 → 100 |
+| bear / ranyi / lirunze (mycapture) | 0.34–0.57 | 97–100 → 100 | 100 → 100 |
+| xiaoyu (mycapture) | 0.64 | 91.8 → **0.0** | 100 → 77.8 |
+| stephen (stair-dk) | 0.48 | 92.5 → 89.9 | 99.2 → 99.6 |
+| man2 / lady2 / man1 / lady1 (stair-dk) | 0.76–0.89 | 93/43/81/99 → 80/13/20/72 | 100/98/99/100 → 9/0/6/96 |
+
+The drop is governed by the ROOM–IDENTITY CONFOUND (§2.12, §11.1), not by
+duplication: an identity the room alone identifies never drops (leo, and the
+mycapture group at these block boundaries), the five-person stairwell room
+drops by 13–98 pp because within-room discrimination is required and its
+recordings are short, and the near-duplicate ratio is itself a room property
+(Azure Kinect speckle in the stairwell). Ratio and drop are both proxies for
+"which room", so ten points in three rooms cannot test the leak mechanism.
+Write it as tested-and-unsupported in the negative-results section — and
+as a quantitative confirmation of the room-oracle finding (§11.1, 55.6 %
+frame / 30.0 % per-subject): identification on this corpus is largely
+identification of the room. The cross-corpus AGGREGATE remains what it was —
+suggestive, three points now (BIWI ratio 0.38 / drop 38.2 pp; in-house
+mixture / 12.9–22.3 pp; TVRID depth R0→R1 g0 49.1 pp, ratio not measured —
+`shard_ratios()` runs on the TVRID prep unchanged if a third point is ever
+wanted). Do not present a correlation from it.
 
 **Follow-ups (one short CPU session, minutes):**
 ```bash
