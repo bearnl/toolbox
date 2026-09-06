@@ -91,7 +91,14 @@ seconds of observation — and R4 depth reaches:
 | **fusion of the two** | **49.90 %** | **[+34.4, +65.4]** |
 
 against chance 3.57 % and majority 6.34 %, on 103 decisions. **Report all three**: the
-fusion is not the CNN's number. This strengthens the privacy conclusion rather than
+fusion is not the CNN's number.
+
+> **SUPERSEDED 2026-09-06 — quote §14.6, not this table.** The final batch re-ran these
+> five CNN seeds and the regenerated operating point is CNN **28.16 % [14.8, 43.0]**,
+> metric **43.30 % [30.3, 56.1]** (unchanged), fusion **46.99 % [32.9, 61.4]**; the
+> PAIRED fusion−metric difference is **+3.7 pp [−13.8, +20.4]** — not resolvable at
+> n = 28 — while fusion−CNN is +18.8 pp [+9.0, +29.4]. The paper says "~43–47 %", never
+> "fusion adds 6 pp". Why the numbers moved, and the fix, is in §14.6. This strengthens the privacy conclusion rather than
 weakening it — ~50 % on a 28-person enrolled cohort from two and a half seconds of depth
 video refutes "depth is anonymous because humans cannot read it" far more firmly than
 ~15 % did. It remains far from usable open-world identification, which is the honest
@@ -2590,3 +2597,124 @@ Paper 3 is unsubmitted, so nothing public needs correcting.
    the ~27 % oracle or completes the negative arc (§13.10 → §13.17 → wave 19).
 5. Paper 3's author must run the §14.4 verification before that paper is
    drafted.
+
+### 14.6 RESULTS of the final batch — collected 2026-09-06 (ran 2026-08-31)
+
+Every job completed (wave 19: 60/60, wave 20: 30/30, wave 21: 46/46, wave 16:
+38/38, rgbseg, latency, signal-fair through R4, analysis). Retag audit clean:
+744 run files, nothing to rename. Artifacts: `$SCRATCH/hiride2/results/`
+(regenerated `stats_final.json`, `report.md`, `tables.tex`, figs 1–6 on the
+cluster; figs 7–8 rendered on the laptop from the same JSONs); a laptop copy
+sits in `/Volumes/Workspace/study/hiride2-results/` with `collect_final_out.txt`.
+Every number below is copied from those artifacts; where it differs from an
+earlier section, THIS section wins.
+
+**Verdict 1 — feature-level fusion does not move the number (wave 19), and
+that closes the arc.** Paired on seed, best recipe, `--aux metric` vs `none`:
+R4 person_centred +0.18, scale_removed +1.39, sil_scaled +2.65 pp; R3 +0.24,
+−0.89, +0.66 (seed sd 1–4 pp) — every difference inside seed variance. Three
+ways of handing the network the metric information it lacks — score-level
+fusion (§13.10), the distance term (§13.17), the 12 scalars at the head (wave
+19) — and none realises the oracle headroom, which the regenerated fusion table
+still measures at either−metric +7.7 / +9.0 / +8.3 pp with intervals clear of
+zero. Paper sentence: the complementarity is real, the headroom is real, and no
+learned or fixed combination tried here captures it at n = 28.
+
+**Verdict 2 — at the operating point, fusion vs metric is NOT resolvable;
+fusion vs the CNN is.** Gated (52.0 % of test frames retained), W = 25, 103
+decisions: CNN 28.16 % [14.8, 43.0], metric 43.30 % [30.3, 56.1], fusion
+46.99 % [32.9, 61.4]. Paired, subject-clustered: **geo−metric +3.69 pp
+[−13.78, +20.39]**; cnn−metric −15.15 [−31.48, +1.34]; **geo−cnn +18.83
+[+9.01, +29.39]**. Ungated (211 decisions): 24.08 / 30.14 / 37.25; geo−metric
++7.11 [−4.68, +18.53]; geo−cnn +13.18 [+6.08, +21.25]. Top-k at W = 25, gated:
+fusion **47.0 / 81.4 / 87.8 %** (top-1/3/5), metric 43.3 / 66.8 / 77.5 — "the
+right person is in a three-person shortlist four times in five". Per-subject
+decision accuracy (fusion, gated): 3 of 28 never identified, 3 of 28 always,
+median 40 %, sorted `0 0 0 5 7 8 24 30 33 33 33 35 37 40 40 47 55 60 69 73 80
+88 93 93 93 100 100 100` — identifiability is a property of the individual.
+Answer-when-sure (fusion): threshold 0.80 keeps 51 % of decisions at 61.5 %;
+0.90 keeps 36 % at 65.8 %.
+
+**THE OPERATING POINT MOVED, AND WHY — a process finding with a fix.** §0 and
+§13.12 quoted CNN 32.62 / fusion 49.90 at W = 25. Wave 19's `--aux none`
+partners RE-TRAINED the five `R4 scale_removed stripe/aug8/tf10` seeds, and
+"idempotent by filename" is not idempotent by VALUE: fresh GPU draws replaced
+them (CNN@W25 32.62 → 28.16, fusion 49.90 → 46.99; metric unchanged — the RF
+is deterministic). Same cell definition; seed nondeterminism on 103 decisions
+(binomial SE ≈ 4.9 pp). The same thing had already happened silently on
+08-21: wave 17's `--aux none` partners replaced seeds 0–2 of the gap-head
+`person / person_centred / scale_removed / sil_scaled` cells, and wave 16
+replaced gap `scale_removed` / `interior_only`. Consequences, all regenerated:
+- §8.2's R4 gap row now reads person 9.22, person_centred 11.29, scale_removed
+  13.62, sil_scaled 12.97 (was 7.87 / 11.92 / 12.45 / 14.59); R1 g150
+  scale_removed 43.06 (was 47.62), interior_only 38.22 (was 40.92).
+- **No R4 condition-vs-full contrast now clears zero**: sil_scaled +6.27 pp
+  [−1.04, +13.59], scale_removed +6.92 [−0.88, +14.80], interior_only +4.97
+  [−2.20, +12.35]. §8.3 / §13.11's "the only R4 contrast whose interval
+  excludes zero" is **WITHDRAWN**. The paper's claim that framing-normalised
+  outline is what survives rests on the ORDERING across many cells and rungs —
+  which is exactly what §13.11 item 2 said it must rest on.
+- The Z-precision axis is unchanged in substance (its 16-bit anchor is the gap
+  scale_removed cell, now 13.62; 8/4/3/2 bits 12.45 / 13.02 / 11.22 / 12.17;
+  1 bit 9.51): 2 bits ≈ 16 bits still holds.
+- FIX: `hiride_train.py --skip-existing` (exit 0 when the exact cell already
+  has a result). Every future top-up passes it; only a deliberate replacement
+  omits it. The paper quotes ONLY the 2026-08-31 regenerated artifacts.
+
+**Verdict 3 — RGB loses nothing when it segments for itself (wave 20; §13.15
+closed as a measurement).** DeepLabV3-ResNet50 person masks from the RGB shards
+alone: median IoU against the userMap 0.757 (Training), 0.716 (Still), 0.744
+(Walking), empty on 1.1 % of frames. Paired on seed, userMap minus rgbseg: R4
+person −1.66, person_centred −4.01, scale_removed −2.87 pp; R3 +2.37, −1.21,
+−0.71 (sd 2–6) — the RGB-derived mask scores the same or slightly HIGHER (R4
+scale_removed 20.60 % [7.85, 34.92] vs 17.72). So the masked-RGB rows describe
+an RGB-only system as well as an RGB-D one. Caption sentence: "segmenting the
+person from RGB alone with a standard pretrained segmenter (median IoU 0.74
+against the sensor map) changes the masked-RGB numbers by −1.7 to +4.0 pp,
+within seed variance."
+
+**Verdict 4 — the collapse replicates on TVRID (wave 21): 88 identities,
+chance 1.14 %, majority ~2 %.** Depth: R0 62.56 % [57.1, 67.9] → R1 g0 13.51
+[9.3, 18.0] → R1 g5 8.42 [5.3, 11.9] → cross-passage 6.83 [4.5, 9.6]; RGB
+92.92 → 29.46 → 21.57 → 32.08 [26.7, 37.6]; permutation nulls 1.98 / 1.69.
+Three corpora, three sensor technologies (Kinect v1 structured light, Azure
+Kinect ToF, RealSense D455 stereo-IR), three viewpoint regimes: frame-random
+hold-out overstates block-held-out accuracy by 5–9× in every one — C1
+generalises. RGB's advantage: +30.4 pp at R0, +13–16 at R1, **+25.2 at
+cross-passage** — clothes did not change between passages, so the clothing cue
+survives, consistent with §13.9. Depth at cross-passage is 6× chance on ~40-
+frame top-view tracklets — weak recording-disjoint transfer, as at BIWI R3.
+The semantics caveat travels with every TVRID number: its "R4" is
+cross-passage, not cross-session.
+
+**Verdict 5 — table fill-ins.** Metric-floor subject-cluster CIs (n = 3
+seeds, --boot 20000): R4 19.04 % [14.00, 24.40]; full-body-test 28.06
+[21.29, 34.66]; metric+shape full-body-test 32.06 [24.38, 39.58]; R3 15.56
+[9.97, 22.42]; R1 67.97 [59.31, 76.13]; R0 92.11 [90.44, 93.63] — every metric
+cell's lower bound clears the majority rate. Cohort curve with the retrained
+fusion column (this run used 3 draws — **re-run at 12 for the paper**): the
+approximated fusion overstated K = 7 by 17 pp (70.99 vs retrained 54.03),
+K = 14 by 5.8 (65.38 vs 59.57), K = 21 by 1.9 (51.80 vs 49.93); the honest
+fusion curve is 54.0 / 59.6 / 49.9 / 46.4 at K = 7 / 14 / 21 / 28, and at
+K = 7 retrained fusion (54.0) sits BELOW metric alone (62.4) — "fusion is not
+always better" stands. Latency (H100 MIG 1g.10gb, mixed fp16): AlexNet-gap
+3,735,292 params at 1 channel vs 3,758,524 at 3 (0.62 %), 691 vs 562 fps at
+batch 32; a 2023-style Flatten→Dense(4096)×2 head is 72.0 M params at EITHER
+channel count — the input format is irrelevant to model size, the head was the
+size. Signal-fair (`--per-class 400`) completed through R4 at the 6 h wall.
+Dropcorr did NOT run: the archived `inhouse_probe.json` stores
+`far_ddepth_median = None` for every label; `hiride_dropcorr.py` now measures
+the near-duplicate ratio straight from the in-house shard (`--prep-inhouse`).
+
+**Follow-ups (one short CPU session, minutes):**
+```bash
+python hiride_cohort.py --prep $SCRATCH/hiride2/prep --runs $SCRATCH/hiride2/runs \
+    --arch alexnet/stripe/aug8/tf10 --condition scale_removed --full-body --draws 12 \
+    --out $SCRATCH/hiride2/results
+python hiride_dropcorr.py --runs $SCRATCH/hiride2/runs_inhouse \
+    --prep-inhouse $SCRATCH/hiride2/prep_inhouse --biwi-runs $SCRATCH/hiride2/runs \
+    --out $SCRATCH/hiride2/results
+```
+then re-render fig 8 from the 12-draw `cohort.json` and archive off scratch
+(`results/` + a runs tarball + the commit SHA into `ARCHIVE_MANIFEST.txt`).
+After that the campaign is closed; what remains is the manuscript (§11.3).

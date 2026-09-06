@@ -902,6 +902,13 @@ def main():
     ap.add_argument("--permute-labels", action="store_true",
                     help="null control: permute labels within the rows this split "
                          "uses (train+val+test) before training")
+    ap.add_argument("--skip-existing", action="store_true",
+                    help="exit 0 without training if this exact cell already has a "
+                         "result on disk. 'Idempotent by filename' is NOT idempotent "
+                         "by value: waves 16/17/19 re-ran existing seeds and replaced "
+                         "them with fresh GPU draws, moving headline cells by 2-4 pp "
+                         "(HIRIDE_HANDOFF 14.6). Top-ups should pass this; only a "
+                         "deliberate replacement should not.")
     args = ap.parse_args()
 
     for f in (("manifest.npz",) if args.eligibility == "all" else ("manifest.npz", "cues.npz")):
@@ -965,6 +972,23 @@ def main():
         print(f"[cohort] K={args.cohort} draw {args.cohort_seed} of {len(common)} "
               f"eligible: {sorted(pick)}")
     info = describe_split(man, tr, va, te)
+    if args.skip_existing:
+        probe = dict(policy=args.policy, modality=args.modality, arch=args.arch,
+                     init=(args.init if args.arch == "convnext_tiny" else None),
+                     condition=args.condition, seed=args.seed,
+                     guard=args.guard if args.policy.startswith("R1") else None,
+                     permuted=bool(args.permute_labels), bits=args.bits,
+                     depth_slab_mm=args.depth_slab_mm, frames=args.frames,
+                     encoding=args.depth_encoding, erode=args.erode, head=args.head,
+                     eligibility=args.eligibility, ref_eligibility=args.ref_eligibility,
+                     augment=args.augment, test_fuse=args.test_fuse, aux=args.aux,
+                     cohort=args.cohort, cohort_seed=args.cohort_seed,
+                     mask_source=args.mask_source)
+        existing = os.path.join(args.out, f"results_{run_tag(probe)}.json")
+        if os.path.exists(existing):
+            print(f"[skip] {os.path.basename(existing)} exists and --skip-existing "
+                  f"is set -- not retraining (the value on disk stays)")
+            return
 
     classes = sorted(set(man["subject"][tr].tolist()))
     cls_index = {c: i for i, c in enumerate(classes)}

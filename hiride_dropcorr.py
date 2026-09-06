@@ -57,6 +57,34 @@ def per_subject_acc(runs, policy, modality, condition_key, arch="alexnet"):
            {s: len(v) for s, v in accs.items()}
 
 
+def shard_ratios(prep, far_pairs=300, seed=0):
+    """{label: adjacent |ddepth| median / random-pair |ddepth| median}."""
+    man = np.load(os.path.join(prep, "manifest.npz"), allow_pickle=False)
+    dep = np.load(os.path.join(prep, "training_depth.npy"), mmap_mode="r")
+    idx = np.load(os.path.join(prep, "training_index.npz"))["manifest_row"]
+    pos = {int(r): i for i, r in enumerate(idx)}
+    subj, frame = man["subject"].astype(str), man["frame"].astype(np.int64)
+    rng = np.random.default_rng(seed)
+    out = {}
+    for s in sorted(set(subj)):
+        rows = np.flatnonzero(subj == s)
+        rows = rows[np.argsort(frame[rows])]
+        p = np.array([pos[int(r)] for r in rows if int(r) in pos])
+        if len(p) < 20:
+            continue
+        def d(i, j):
+            a, b = np.asarray(dep[i], np.float32), np.asarray(dep[j], np.float32)
+            v = (a > 0) & (b > 0)
+            return float(np.abs(a[v] - b[v]).mean()) if v.any() else np.nan
+        adj = np.array([d(p[k], p[k + 1]) for k in range(len(p) - 1)])
+        far = np.array([d(*rng.choice(p, 2, replace=False)) for _ in range(far_pairs)])
+        a, f = np.nanmedian(adj), np.nanmedian(far)
+        if np.isfinite(a) and np.isfinite(f) and f > 0:
+            out[s] = float(a / f)
+            print(f"[shard] {s:<10s} adjacent {a:7.1f} mm  far {f:7.1f} mm  ratio {a / f:.3f}")
+    return out
+
+
 def spearman(x, y):
     rx = np.argsort(np.argsort(x)).astype(float)
     ry = np.argsort(np.argsort(y)).astype(float)
@@ -68,7 +96,11 @@ def spearman(x, y):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--runs", required=True, help="the in-house runs dir")
-    ap.add_argument("--probe", required=True, help="inhouse_probe.json")
+    ap.add_argument("--probe", default=None, help="inhouse_probe.json (needs far medians)")
+    ap.add_argument("--prep-inhouse", default=None,
+                    help="in-house prep dir; measures the ratio from "
+                         "training_depth.npy when the probe JSON lacks it")
+    ap.add_argument("--far-pairs", type=int, default=300)
     ap.add_argument("--biwi-runs", default=None,
                     help="main BIWI runs dir, for the aggregate reference point")
     ap.add_argument("--biwi-ratio", type=float, default=0.38,
@@ -78,17 +110,27 @@ def main():
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    probe = json.load(open(args.probe))
     ratios = {}
-    for label, rec in probe.items():
-        if not isinstance(rec, dict):
-            continue
-        adj, far = rec.get("adjacent_ddepth_median"), rec.get("far_ddepth_median")
-        if adj and far:
-            ratios[str(label)] = float(adj) / float(far)
+    if args.probe and os.path.exists(args.probe):
+        probe = json.load(open(args.probe))
+        for key, rec in probe.items():
+            if not isinstance(rec, dict):
+                continue
+            label = str(key).split("/")[-1]           # keys are "<dir>/<label>"
+            adj, far = rec.get("adjacent_ddepth_median"), rec.get("far_ddepth_median")
+            if adj and far:
+                ratios[label] = float(adj) / float(far)
+    if not ratios and args.prep_inhouse:
+        # The shipped inhouse_probe.json stores far_ddepth_median = None for
+        # every label (its far-pair sampling did not run in the archived
+        # call), so measure the ratio directly from the prep shard: median
+        # adjacent |ddepth| over median random-pair |ddepth| within each
+        # identity, valid pixels only. Same definition the probe prints.
+        ratios = shard_ratios(args.prep_inhouse, args.far_pairs)
     if not ratios:
-        raise SystemExit(f"no per-label ratios found in {args.probe} -- keys: "
-                         f"{list(probe)[:8]}")
+        raise SystemExit("no per-label near-duplicate ratios: pass --probe with "
+                         "far medians, or --prep-inhouse to measure them from "
+                         "the shard")
 
     report = {}
     for modality in ("depth", "rgb"):
