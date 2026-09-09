@@ -7,6 +7,24 @@ machines") are journal-level against the literature, then write the paper's
 "essence" (thesis, defensible contributions, structure) for the author's approval.
 The author asked for the audit FIRST, then the essence, then the rewrite.
 
+## STATUS UPDATE 2026-09-09 — audit COMPLETE, essence written, decisions taken
+
+Resumed under Fable 5.1 (the 09-06 session's last message was the model switch). Every row
+below marked RELAUNCH has been relaunched and completed: `01_protocol_AUDIT_COMPLETE.md`,
+`03_depthid_AUDIT_COMPLETE.md`, `04_privacy_thesis_AUDIT_COMPLETE.md`,
+`04c_venue_tprivacy_COMPLETE.md` (IEEE T-Privacy ranked fifth; PoPETs first),
+`05_standards_precedents_COMPLETE.md`, plus `07_multigait_delecluse_DEEPREAD.md` (primary-text
+read: MultiGait's "depth" is a size-normalised silhouette, its single-session split is per
+walk ≈ R3, 100 → 65–77 %, probes ≤ 64) and four adversarial refutation passes
+`08_refute_{C1,C2,C3C4,THESIS}.md` whose "safe wording" lines are BINDING for every
+"first / to our knowledge" sentence in the manuscript. **`ESSENCE.md`** is the one-page
+statement written for the author; the author answered its five decisions on 2026-09-09
+(PoPETs — T-Privacy rejected the 2023 paper; wave 22 approved; keep HI-RIDE; in-house
+consented; IAS-Lab no response) — see ESSENCE.md §"Author's decisions" and HIRIDE_HANDOFF
+§14.8. Next: run wave 22 on Nibi (`submit_wave22.sh`), then the main.tex rewrite on the
+PoPETs template. The `extracts/` and `transcripts/` bulk stays in
+`/Volumes/Workspace/study/hiride2-results/lit-audit/` (not in this repo).
+
 ## Status
 
 | audit | brief | status | deliverable |

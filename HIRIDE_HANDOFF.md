@@ -2779,3 +2779,110 @@ second; TOPS excludes biometrics; IEEE T-Privacy not yet assessed). Newest insta
 of the rebutted claim: Delécluse et al. arXiv:2606.23230 (June 2026), depth-only
 transformer 60.7 % rank-1 on BIWI, "inherently preserves privacy". Next: relaunch
 audits 01/03/04/05, then write the ESSENCE for the author's approval, then rewrite.
+
+### 14.8 Session 2026-09-09 — audit complete, essence, decisions, the standard-protocol rung, a table bug
+
+Resumed under Fable 5.1 from the app conversation "Experiment review and paper revisions"
+(its last message was the switch to Opus 5). Everything the 09-06 session saved was
+relaunched as self-contained agents (no sub-delegation; ~60 tool calls each; extracts
+reused) plus a primary-text deep-read of MultiGait and Delécluse, then one adversarial
+"refute every surviving claim" pass per contribution. All reports are in
+`paper2_lit_audit/` (README_HANDOFF.md carries the status table); the bulk extracts and
+agent transcripts stay in `hiride2-results/lit-audit/`.
+
+**Facts that change the paper (each verified in a primary text):**
+- MultiGait (arXiv:2609.01036): its "depth" result is a size-normalised binary silhouette
+  from empty-room subtraction — it never evaluates depth values; its single-session split
+  is per whole walk (≈ our R3), so it has no frame-random rung; numbers are 100 → 65–77 %
+  (GaitBase) with probes ≤ 64 people against a 199-identity gallery; it calls cross-session
+  generalisation an open gap; it says sensing technology "has little impact" once
+  silhouettes exist (our thesis, corroborated). Nothing in it touches the ladder, the
+  attribution suite, the bit-depth axis, the operating point or the negative results.
+- TUM-GAID (Hofmann et al., JVCIR 2014, Table 6) published depth same-session vs
+  three-months-later numbers in 2014 (depth-GEI 96.8 → 28 %, DGHEI 99.0 → 50 %); Patruno
+  et al. (PR 2019) published a frame-level 97.84 % on BIWI. So: "MultiGait supplies the
+  only endpoints" and "the depth field never saw its inflated number" are FALSE — say the
+  R0 number was never placed beside the cross-day number on one pipeline.
+- Prior depth-only cross-session numbers on the SAME 28 BIWI probe people: Munaro 2014
+  21–32 % single / 42.9 % multi; Wu 2017 24.47 % Walking / 30.52 % Still; Karianakis 2018
+  25.4 % single / 50.0 % multi; Haque 2016 30.1 % single / 45.3 % multi (50-class softmax,
+  chance 2 %). Our single-frame CNN (6.7 %) and metric features (19 %) sit BELOW that band;
+  the gated 2.5-s operating point (43–47 %) sits INSIDE it. The paper must show this itself
+  and explain the gap mechanistically (full frame carrying the room; matched n_train; one
+  training recording; a 2.5-s budget instead of whole sequences) — hence wave 22.
+- RealGait (Zhang et al., arXiv:2201.04806 §V-E3) swept pixel-intensity precision from the
+  binary silhouette to 8-bit grey at fixed model for RGB gait → our axis is "depth-VALUE
+  precision", cite it. Rueda-Toicen et al. 2026 use inpainted background-only as a leakage
+  ratio for wildlife re-ID → "inpaint the subject out" is not new in any modality; the
+  own-plate exact complement, depth, and ladder resolution remain ours.
+- Metric anthropometry from consumer depth is 2012–2018 practice (Barbosa 2012 cross-day,
+  height most informative; Munaro 2014; Andersson & Araujo 2015; Paolanti 2018 skeleton-free
+  top-view; John 2013 height beats colour) — REFUTED as a mechanism discovery. What
+  survives: unprojected frontal depth through the sensor mask, no skeleton, in mm, with a
+  drift model, beating THE CNNs WE TRAIN (never "every CNN").
+- Karianakis 2018 ablated learned per-frame weighting on BIWI cross-session (RTA 50.0 vs
+  uniform 45.7) → our gate is "the first explicit, mechanism-derived full-body gate with
+  quantified clipping prevalence (74 %) and metric drift (89.5 mm/m)", not the first sign
+  that frame selection matters. Rao et al. TPAMI 2022 sweep skeleton sequence length on
+  BIWI → "no BIWI work reports DEPTH-IMAGE accuracy against a wall-clock budget".
+- "Gait is untestable on BIWI" contradicts Haque 2016 Table 3 (GEI 21.4 %, GEV 25.7 %
+  multi-shot on whole sequences). Write: gait cycles could not be segmented under OUR
+  protocol (single 2.5-s probes, 74 % of frames clipped).
+- Mucha & Kampel 2022 already ran a depth-specific spatial-resolution degradation test
+  (faces: FR survives to 40 % scale, fails below 10 %) and catalogued contradictory
+  depth-privacy publications; the processing-based reading of GDPR Art. 4(14) is settled
+  scholarship (Jasserand 2016; Kindt 2018; Bygrave & Tosoni 2020). Cite all; our additions
+  are the value-precision and masking controls, the 16-deployment catalogue with two
+  same-institution contradictions, and the application of the instruments to depth body
+  sensing. "No regulator text mentions thermal/3-D" is false (CNIL 2020 thermal-camera
+  guidance; WP193 3-D anti-spoofing) — the survivable sentence is "none addresses depth or
+  3-D BODY sensing as a modality, and none declares any sensor non-identifying".
+- Delécluse et al. is IEEE FG 2025 (DOI 10.1109/FG61629.2025.11099215), arXiv June 2026;
+  its BIWI query/gallery pairing is unspecified and 60.7 % = 17/28. Georgiev 2022 has 470
+  users (audit 06 said 515). TVRID: the competition paper says 86 identities, Zenodo 88 —
+  check the labels before quoting a count. Mucha & Kampel's "BIWI" is Fanelli's head-pose
+  set, not BIWI RGBD-ID.
+
+**Venue (04c):** PoPETs first — the only venue with the exact methodological precedent
+(Hanisch 2024), an audit genre, a 12-page cap on the body only, an artifact track, no fee;
+Issue 3 deadline 30 Nov 2026 (notification 1 Feb 2027), Issue 4 28 Feb 2027. T-BIOM
+fallback. IEEE Transactions on Privacy fifth: zero biometric/vision/sensing papers among
+its 24 research articles, DP/FL/crypto reviewer pool, not in DOAJ. Move out of
+`submissions-IEEE-on-Privacy/`, drop `ieeetj.cls`, build on acmart sigconf.
+
+**Author's decisions (2026-09-09):** (1) IEEE Transactions on Privacy REJECTED the 2023
+paper → PoPETs. (2) Commensurability cell approved: "fix the code and we can easily run
+it" → wave 22. (3) Keep the HI-RIDE name where it fits. (4) In-house corpus: all
+participants consented. (5) IAS-Lab: no response → TVRID closes external validity; the
+clothing axis stays BIWI-only.
+
+**Code (commit 2ffce28):**
+- `hiride_data.py`: policies `R4_standard_walking` / `R4_standard_still` — `_policy_cross(...,
+  train_all_subjects=True)`: EVERY Training recording trains (50 classes, chance 2.00 %),
+  the 28 shared subjects' Walking / Still frames test. Walking test frames are
+  byte-identical to R4_cross_session's; R4's training rows are a subset. Verified on a
+  synthetic manifest; `test_hiride_splits.py` §8 checks it on the real tree.
+- `hiride_train.py`: `tracklet_scores()` — one decision per test recording from the mean
+  posterior (the field's "multi-shot" number), recorded on EVERY cell as `tracklet_acc`,
+  `tracklet_n`, `tracklet_per_subject`.
+- `make_runs.py --wave 22`: 2 policies × {full, person, scale_removed gap, scale_removed
+  stripe/aug8/tf10, rgb scale_removed stripe/aug8/tf10} × 5 seeds = 50 cells, every line
+  `--skip-existing`. `submit_wave22.sh` submits the array at %8 and an afterany CPU
+  analysis job (floors under the new rungs, stats_final.json, tables.tex/report.md);
+  `collect_wave22.sh` reads it back. Budget stated: ~4–10 min per cell (training pool 1.8×
+  R4's), ~4–8 GPU-hours.
+- `hiride_metric_floor.py` LADDER and `hiride_floor.py` loops include the new rungs.
+- **`hiride_report.py` BUG, fixed:** it keyed cells on (policy, modality, arch, condition,
+  bits) only, so stripe-head, augmented, tracklet-fused and flatten-head runs were averaged
+  into the gap-head rows of Tables 2–4. The 2026-08-31 `tables.tex` shows R4 depth
+  scale_removed 18.12 ± 7.45 (all recipes) where the gap cell is 13.62 (5 seeds),
+  person_centred 16.07 vs 11.29, and the Z-axis 16-bit anchor 18.12 vs 13.62. §14.6's
+  numbers (from stats_final.json, which keys correctly) were right; the LaTeX tables were
+  not. Now keyed through `hiride_keys`; tables A–C take the default recipe; new table D =
+  the standard protocol beside R4, single- and multi-shot, recipe named per row. **Quote
+  no mechanism or bit-depth number from the 08-31 tables.tex; regenerate.**
+
+**Next:** author pushes and runs `bash submit_wave22.sh` on Nibi; then the manuscript on
+the PoPETs template per ESSENCE.md and §11.3, with the `08_refute_*` safe wordings as the
+ceiling for every novelty sentence.
+
