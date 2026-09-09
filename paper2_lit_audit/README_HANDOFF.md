@@ -17,12 +17,41 @@ The author asked for the audit FIRST, then the essence, then the rewrite.
 | thesis / premise-in-the-wild / legal / IEEE T-Privacy fit | briefs/04 | STOPPED mid-search (107 web actions) | 04_privacy_PARTIAL_notes.md — RELAUNCH |
 | standards / precedents / objections | briefs/05 | v1 over-delegated and stalled (147 actions); v2 relaunch stopped at start | 05_standards_v1_PARTIAL_notes.md — RELAUNCH (self-contained brief) |
 | venue fit (TIFS, T-BIOM, TOPS, PoPETs, S&P) — a sub-agent of v1 | — | **COMPLETE** | venue_fit_audit.md (verbatim) |
+| standards / reporting checklist — a sub-agent of v1 | — | **COMPLETE** | 05_standards_CHECKLIST_COMPLETE.md (ISO 19795, Rule of 30, cluster bootstrap, REFORMS, leakage taxonomy, Chaibub Neto permutation, McNemar, MDE — each with a Methods sentence) |
+| non-depth modalities prior art — a sub-agent of the thesis audit | — | **COMPLETE** | 04b_nondepth_modalities_COMPLETE.md — **contains the MultiGait pre-emption (read first)** |
+| venue fit B (PR, CVIU, JBHI, IMWUT, Access, NMI, npj) — sub-agent | — | **COMPLETE** | venue_fit_audit_B.md (IMWUT best of these; IEEE Access explicitly welcomes negative results; npj has the Nebbia/Engelmann split-artefact precedent but excludes small cohorts) |
+| identity-leakage paper list + split-leakage evidence — sub-agent | — | **COMPLETE** | 06_identity_leakage_papers_COMPLETE.md — **states the C1 gap: no 2020+ paper quantifies frame-random vs subject-disjoint inflation for VISION person-ID; Georgiev ASIA CCS 2022 / Melzi 2023 / Hwang 2021 do it for touch/ECG/PPG** |
+| premise-in-the-wild, legal framing, IEEE T-Privacy fit, 2026 venue scan | briefs/04 | STOPPED (grandchildren killed) | 04_privacy_PARTIAL_notes.md; premise exemplars already in hand: Ballester 2024 ToiletHelp ('sensing only depth maps'), Haque Nature 2020, Zhu JBHI 2024 defocus, Basile 2026 LiDAR 'anonymized', Zhu SenSys 2021 thermal array, Ryoo AAAI 2017 |
 
 `transcripts/` holds the raw JSONL of every agent (do not load whole into a model
 context); `extracts/` holds the pages/PDFs/text the agents fetched (e.g. tian2018.txt,
 xiao2021.txt, hat2022.txt, wu2017.txt, lidargait.txt, tumgaid_preprint.txt,
 marin2018.txt, liu2025.xml, tvrid2026.txt, delecluse2026.txt) — reuse them instead of
 re-fetching.
+
+## READ FIRST — the strategic finding
+
+**MultiGait (Todt, Morsbach, Dissert, Strufe; arXiv:2609.01036, posted 1 Sep 2026 — Strufe's
+group, the PoPETs "False Sense of Privacy" authors).** 199 people, 8 sensors incl. depth,
+thermal, LiDAR, radar, WiFi; 4 viewpoints; 3 sessions; session-disjoint evaluation; depth
+>98 % within-session → 60–80 % cross-session; explicit "false sense of privacy" framing.
+It PRE-EMPTS the broad thesis ("privacy-friendly sensors still identify people across
+sessions") at a scale we cannot match. What it does NOT do — and what therefore becomes
+the paper's spine — is the MECHANISM and the DEPLOYMENT-FACING measurement: (i) the
+protocol decomposition (the ladder + trivial-cue floor + adjacency measurement explaining
+WHY within-session numbers are near-ceiling, which MultiGait observes but does not
+dissect); (ii) attribution — room vs person, outline vs 3D shape, the inpainted exact
+complement, the 16→1-bit precision axis, "masking the person out is not a control";
+(iii) the operating point under a 2.5-s observation budget with a validity gate,
+top-k, per-person identifiability (0–100 %), cohort-size dependence; (iv) the
+pre-registered negative results on fusion. Reframe the essence accordingly: cite
+MultiGait prominently as the scale result and position this paper as the mechanistic
+and evaluation-methodology complement, not as the discovery that depth identifies.
+Their cross-session 60–80 % on 199 people with modern models makes our 43–47 % on 28
+look conservative, not wrong. Also cite: Nair et al. 2024 (reduced precision does not
+stop VR-motion re-ID), Wu et al. ECCV 2018 (only cropping the whole body removes
+identity), Hammerla & Plötz UbiComp 2015 (adjacent-sample CV inflation in HAR),
+Chaibub Neto 2019 (subject-level permutation for identity confounding).
 
 ## Key findings so far (verified by the completed audits)
 
