@@ -785,6 +785,29 @@ class TestCurve(tf.keras.callbacks.Callback):
             logs["test_acc"] = acc                 # also lands in hist.history
 
 
+def tracklet_scores(prob, truth, group):
+    """One decision per test recording: the mean posterior over every frame of
+    that recording, argmax once.
+
+    This is the field's "multi-shot" number -- Karianakis et al. (2018) pool a
+    CNN-LSTM over the whole Walking sequence, Haque et al. (2016) feed the
+    sequence to 4D-RAM -- computed for every cell so the standard-protocol rungs
+    can be set beside the published BIWI numbers without a second pass over
+    `cm_*.npz`.  `tracklet_n` (28 on BIWI) travels with the accuracy because a
+    rate over 28 decisions is not the same kind of number as one over 5,000
+    frames, and `tracklet_per_subject` is its class-balanced twin."""
+    correct, per_subject = [], {}
+    for g in np.unique(group):
+        rows = np.flatnonzero(group == g)
+        decision = int(np.argmax(prob[rows].mean(0)))
+        target = int(truth[rows[0]])
+        hit = float(decision == target)
+        correct.append(hit)
+        per_subject.setdefault(target, []).append(hit)
+    return dict(tracklet_acc=float(np.mean(correct)), tracklet_n=int(len(correct)),
+                tracklet_per_subject=float(np.mean([np.mean(v) for v in per_subject.values()])))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--prep", required=True)
@@ -1168,6 +1191,10 @@ def main():
             print(f"[tracklet] window={args.test_fuse}  {fused['fused_n']} windows  "
                   f"acc={100 * fused['fused_acc']:.2f}%  "
                   f"per-subj={100 * fused['fused_per_subject']:.2f}%")
+    tracklet = tracklet_scores(prob, truth, man["group"][te])
+    print(f"[tracklet] whole recording: {tracklet['tracklet_n']} decisions  "
+          f"acc={100 * tracklet['tracklet_acc']:.2f}%  "
+          f"per-subj={100 * tracklet['tracklet_per_subject']:.2f}%")
 
     res = dict(
         policy=args.policy, modality=args.modality, arch=args.arch,
@@ -1192,7 +1219,7 @@ def main():
         mask_source=args.mask_source,
         cross_val_guard=(args.cross_val_guard
                          if args.policy.startswith(("R3", "R4")) else None),
-        augment=args.augment, **fused,
+        augment=args.augment, **fused, **tracklet,
         normal_baseline=args.normal_baseline,
         n_classes=len(classes),
         elapsed_s=round(time.time() - t0, 1),

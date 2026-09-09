@@ -160,7 +160,8 @@ def main():
                                 match_ntrain=targets, keep=keep)
         record(f"R1_block_guard{g}", tr, va, te, {"guard": g})
 
-    for name in ("R3_cross_recording", "R4_cross_session"):
+    for name in ("R3_cross_recording", "R4_cross_session",
+                 "R4_standard_walking", "R4_standard_still"):
         try:
             tr, va, te = make_split(man, name, seed=0, keep=keep)
             record(name, tr, va, te)
@@ -224,7 +225,8 @@ def main():
     # The cross-session rung needs its own null: with K=28 and an imbalanced
     # test set, 1/K badly understates what a label-free model already achieves,
     # so "1.5x chance" is not the right way to read R4.
-    for pol in ("R3_cross_recording", "R4_cross_session"):
+    for pol in ("R3_cross_recording", "R4_cross_session",
+                "R4_standard_walking", "R4_standard_still"):
         try:
             tr, va, te = make_split(man, pol, seed=0, keep=keep)
             null_band(pol, tr, te)

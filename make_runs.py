@@ -452,12 +452,36 @@ WAVE21 = dict(
                       ("R4_cross_session", "--cross-val-guard 5")],
 )
 
+WAVE22 = dict(
+    doc="The field's BIWI protocol as a commensurability rung (HIRIDE_HANDOFF "
+        "14.8). Every Training recording trains a 50-way classifier, tested on "
+        "the 28 re-recorded subjects' Walking (Haque 2016; Karianakis 2018) and "
+        "Still (Wu 2017) sequences. Published cross-session numbers on exactly "
+        "this probe set are 21-30 % single-shot and 43-50 % multi-shot; the "
+        "ladder's R4 (28 classes, shared-subject pool) scores below that band "
+        "per frame, and the paper must set the two side by side and explain the "
+        "gap rather than let a reviewer discover it. Inputs: the ladder's own "
+        "full frame and in-place person; the re-centred, rescaled person (the "
+        "closest analogue of the body-index crop the prior CNNs consumed) under "
+        "the gap head and under the best cross-session recipe; rgb under that "
+        "recipe for the modality contrast. 5 x 2 x 5 = 50 cells, ~4-10 min each "
+        "on a 1g.10gb slice (the training pool is 1.8x R4's). Every line carries "
+        "--skip-existing (14.6): a re-run must never replace a seed by value.",
+    policies=[("R4_standard_walking", ""), ("R4_standard_still", "")],
+    cells=[("full", "depth", ""),
+           ("person", "depth", ""),
+           ("scale_removed", "depth", ""),
+           ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10"),
+           ("scale_removed", "rgb", "--head stripe --augment 8 --test-fuse 10")],
+    seeds=[0, 1, 2, 3, 4],
+)
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
                     choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-                             19, 20, 21))
+                             19, 20, 21, 22))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -541,6 +565,14 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 22:
+        for policy, extra in WAVE22["policies"]:
+            for cond, mod, flags in WAVE22["cells"]:
+                for seed in WAVE22["seeds"]:
+                    lines.append(" ".join(
+                        f"--policy {policy} --modality {mod} --arch alexnet "
+                        f"--condition {cond} --seed {seed} {flags} {extra} "
+                        f"--skip-existing".split()))
     elif args.wave == 18:
         for policy in WAVE18["policies"]:
             for k in WAVE18["cohorts"]:

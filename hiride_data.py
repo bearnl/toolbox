@@ -310,18 +310,30 @@ def _policy_block(man, pool, rng, guard=0, test_frac=0.2, val_frac=0.1,
             np.array(sorted(te_all), dtype=np.int64))
 
 
-def _policy_cross(man, rng, train_seq, test_seq, val_frac=0.15, guard=50, **kw):
+def _policy_cross(man, rng, train_seq, test_seq, val_frac=0.15, guard=50,
+                  train_all_subjects=False, **kw):
     """R3/R4 -- train on one sequence, test on another, restricted to subjects
     that appear in both.  R3 changes the recording; R4 changes the day AND the
     clothing.  Test set is byte-identical between them, so the R3->R4 delta
-    isolates session+clothing."""
+    isolates session+clothing.
+
+    `train_all_subjects=True` is the field's BIWI protocol (Haque et al. 2016,
+    Karianakis et al. 2018): EVERY recording of `train_seq` trains, so the
+    classifier has one output per Training subject (50) and the 22 subjects who
+    were never re-recorded act as distractor classes.  The test set is still
+    the shared subjects' `test_seq` frames -- byte-identical to the restricted
+    variant -- so the two differ only in the training pool and the size of the
+    decision space (chance 1/50 against 1/28)."""
     shared = set(_shared_subjects(man))
     if not shared:
         raise RuntimeError(
             f"no subject appears in both '{train_seq}' and '{test_seq}' -- this policy "
             "needs BOTH Training/ and Testing/ extracted (Testing.rar not staged?)")
     in_subj = np.array([s in shared for s in man["subject"]])
-    tr_pool = np.where((man["seq"] == train_seq) & in_subj)[0]
+    tr_sel = man["seq"] == train_seq
+    if not train_all_subjects:
+        tr_sel = tr_sel & in_subj
+    tr_pool = np.where(tr_sel)[0]
     te = np.where((man["seq"] == test_seq) & in_subj)[0]
     if len(tr_pool) == 0 or len(te) == 0:
         raise RuntimeError(f"empty pool: train '{train_seq}'={len(tr_pool)} "
@@ -344,6 +356,17 @@ POLICIES = {
     "R4_cross_session": dict(fn=_policy_cross,
                              kw=dict(train_seq="Training", test_seq="Testing/Walking"),
                              doc="different day, different clothes -- PRIMARY"),
+    "R4_standard_walking": dict(fn=_policy_cross,
+                                kw=dict(train_seq="Training", test_seq="Testing/Walking",
+                                        train_all_subjects=True),
+                                doc="the field's protocol: every Training recording "
+                                    "(50 classes) -> Walking of the 28; test frames "
+                                    "byte-identical to R4_cross_session"),
+    "R4_standard_still": dict(fn=_policy_cross,
+                              kw=dict(train_seq="Training", test_seq="Testing/Still",
+                                      train_all_subjects=True),
+                              doc="the field's protocol, Still probe (Wu et al. 2017's "
+                                  "frontal standing sequences)"),
 }
 
 

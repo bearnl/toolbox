@@ -34,7 +34,8 @@ from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
 from hiride_stats import cluster_boot, boot_rng
 
 LADDER = [("R0_frame_random", {}), ("R1_block", dict(guard=150)),
-          ("R3_cross_recording", {}), ("R4_cross_session", {})]
+          ("R3_cross_recording", {}), ("R4_cross_session", {}),
+          ("R4_standard_walking", {}), ("R4_standard_still", {})]
 
 
 def fit_eval(Xtr, ytr, Xte, yte, seed, model="rf"):

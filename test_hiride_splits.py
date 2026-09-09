@@ -105,6 +105,25 @@ def main():
         except RuntimeError as exc:
             check(f"{name} unavailable -> raises clearly", not has_testing, str(exc)[:90])
 
+    print("\n8. the field's protocol: every Training recording trains, the 28's probe tests")
+    try:
+        r4_tr, _, r4_te = make_split(man, "R4_cross_session", seed=0)
+        k_training = len(set(man["subject"][man["seq"] == "Training"].tolist()))
+        for name in ("R4_standard_walking", "R4_standard_still"):
+            tr, va, te = make_split(man, name, seed=0)
+            info = describe_split(man, tr, va, te)
+            check(f"{name} trains on every Training subject", info["k_train"] == k_training,
+                  str(info))
+            check(f"{name} tests only subjects seen in training",
+                  info["k_test"] == len(set(man["subject"][r4_te].tolist()))
+                  and not info["unseen_test_subjects"], str(info))
+            check(f"{name} train is a superset of R4's train", set(r4_tr).issubset(set(tr)))
+            check(f"{name} train/test disjoint", len(np.intersect1d(tr, te)) == 0)
+        _, _, te_w = make_split(man, "R4_standard_walking", seed=0)
+        check("standard Walking test frames == R4 test frames", np.array_equal(te_w, r4_te))
+    except RuntimeError as exc:
+        check("standard policies unavailable -> raise clearly", not has_testing, str(exc)[:90])
+
     print("\n" + ("ALL INVARIANTS HELD" if not FAILURES
                   else f"{len(FAILURES)} FAILURE(S): {FAILURES}"))
     return 1 if FAILURES else 0
