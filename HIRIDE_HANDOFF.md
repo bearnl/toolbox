@@ -2886,3 +2886,102 @@ clothing axis stays BIWI-only.
 the PoPETs template per ESSENCE.md and §11.3, with the `08_refute_*` safe wordings as the
 ceiling for every novelty sentence.
 
+### 14.9 Session 2026-09-09 (cont.) — the twelve features documented; "why the CNN failed" put to the record
+
+Author's questions after the reframe ("what carries discriminative information", two sides
+converging): (1) what are the metric features and why those; (2) why did the CNN — good at
+RGB — not find them. One features report, three independent theory lenses and one hostile
+check per lens, all in `paper2_lit_audit/09_*.md`. Read the three `09_cnn_failure_refute_*`
+before quoting any mechanism: the skeptics overturned the comfortable story.
+
+**Features (`09_metric_features.md`).** The 12 `BASE_METRIC` columns, definitions, units,
+error model and lineage are documented there. Two disclosures it forces:
+- **The published features were NOT computed in a gravity-aligned frame.** §12.3 already
+  recorded it and §13.14 then contradicted it: `_groundCoeff.txt` parsed on 130/28,037
+  frames (same `sibling()` timestamp bug as `_skel.txt`, §13.16), so `h` is the camera's
+  −Y. Unprojection still cancels translation and standing distance; camera PITCH does not
+  cancel — a height-axis scale error, consistent with §13.13's suspected "third defect".
+  Write "camera-frame millimetres" unless the plane is recovered and every metric number
+  re-run. One-line check of the `ground` column mean on Nibi (≈0.005 expected).
+- `w_XX` bands with ≤30 pixels are written as 0.0 and read by the RF as a measurement;
+  disclose, fix only with a full recompute. Parameter count: `latency.json` gives
+  alexnet/gap 3,735,292, stripe 3,778,300, convnext_tiny 27,838,588, 2023 head 72,008,444;
+  §13.17's "~23M" matches none — derive for the quoted recipe before print.
+
+**THE FINDING THAT REFRAMES "WHY THE CNN FAILED" (all three skeptics, from stored JSONs).**
+For the quoted recipe (`alexnet/stripe/aug8/tf10`, `scale_removed`) the CNN and the
+12-feature RF are at **single-frame parity on the same 5,642 R4 frames: 18.36 vs 18.83 %**
+(`sequence_ungated_best.json`), and at ungated whole tracklet 25.00 vs 26.43. The CNN is
+MORE robust on clipped frames (≈14.9 vs 8–9 %, back-solved) and 7 pp behind on whole
+bodies (21.6 vs 28.9). The whole headline gap (28.2 vs 43.3 at gated W=25) is therefore
+produced by (i) the gate — which removes exactly the frames where a MEASUREMENT is invalid
+and where the CNN happened to be the more robust system — and (ii) integration under the
+gate (+21.9 pp RF vs +7.7 CNN at whole tracklet). There is no single-frame
+representational ceiling to explain; the gap-head deficit (13.62 vs 19.04) was closed by
+the stripe head + ±8 px augmentation under the SAME data, split, loss and stopping rule.
+Also: the R3 > R4 contrast holds only for room-carrying inputs; on every person-only
+condition R3 ≈ R4 (person 8.65/9.22, centred 9.08/11.29, scale_removed 13.76/13.62, RF
+15.56/19.04) — "session shift beats data quantity" is a ROOM statement. Consequence for
+the reframed paper: the two sides literally converge at the frame level (outline ≈
+millimetres in accuracy); the measurements pull ahead only under measurement discipline
+— refusing invalid frames and integrating — which is the operational content of
+"explainable".
+
+**Verdicts on the proposed mechanisms (SUPPORTED / CONTRADICTED / UNTESTED as an
+EXPLANATION of the deficit, not as a description of the code):**
+- "The conv stack cannot form (u−cx)·z/f and gets no gradient to" — CONTRADICTED: §13.17
+  (`--aux dist`) and wave 19 (`--aux metric`) handed it the factor and the product; nothing
+  moved. The network does not USE size; that is different from cannot compute it.
+- "`scale_removed` deletes size; clipping remaps rows" — CONTRADICTED as explanation: the
+  CNN is the LESS clipping-sensitive system; the full_body-trained cell (0.20) shows
+  removing the framing shift from training does not help.
+- "GAP discards arrangement" — SUPPORTED only as an R1 description and CONFOUNDED: aug8 with
+  the GAP head kept lifts R1 scale_removed 0.43 → 0.64, matching the head change.
+- "2 bits ≈ 16 bits ⇒ reads the outline" — SUPPORTED, bounded: the axis limits the
+  interior's contribution to ≲3–4 pp (2-bit sd 0.05; 3-bit dips 2.4 pp), not zero.
+- "Shortcut learning / gradient starvation" — CONTRADICTED in strong form: at R1 the
+  normalised CNN equals the RF (66.9–69.7 vs 67.97); at R4 single-frame parity.
+- "Within-session early stopping selects the wrong epoch" — UNTESTED (never measured;
+  wave-4 ConvNeXt cells carry `test_curve` → bound it: max(test_curve) − test_curve[best_epoch]).
+- "Aux branch starved" — UNTESTED; cheapest test: 12-input MLP under the CNN's own regime
+  on the laptop (CPU minutes). Near 19 % ⇒ input is the regime; far below ⇒ the regime hurts.
+- "Memorisation; sessions not frames" — CONTRADICTED as stated (wave 18 cohort effect; the
+  frames clause is what wave 22 tests directly).
+- "Metric errors decorrelate, CNN's are systematic" — SUPPORTED for the gap head (18.40 →
+  20.71); only PARTLY for the best recipe (+9.8 vs +25.4 pp); "same wrong identity per
+  clip" UNTESTED; **veto artefact UNTESTED**: posteriors stored float16, product-rule
+  aggregation (`agg="geo"`, log(1e-12) floor) — a zeroed true-class frame can veto a
+  window; applies to the RF too. Re-aggregate with the arithmetic mean BEFORE writing
+  "systematic". Ungated "peak and fall" is inside decision-count noise (211/41 decisions).
+- "Both fail together on corrupted frames ⇒ small oracle" — CONTRADICTED as causal: mild
+  positive dependence is measured (either 1.5–3 pp below a+b−ab), but oracle − metric is
+  bounded by P(CNN right); the clipped-frame attribution is UNTESTED (add `--full-body` to
+  `hiride_fuse.py` and stratify).
+- Menagerie (6 metric goats / 4 sheep; fusion 3/3; five goats move under fusion) —
+  SUPPORTED as description; labels rest on 3–7 windows per subject; causes in mm UNTESTED.
+- Explainability, operationally defined (inputs re-measurable lengths; refusals stated
+  geometric conditions; failures assignable in the same units) — SUPPORTED with the
+  camera-frame correction; per-decision attribution not yet computed ("can be given").
+- Field's networks differ in representation/data (Haque 4-D voxels; Karianakis crop +
+  transfer + RTA; LidarGait 1,050 ids) — SUPPORTED; wave 22 is the only planned run that
+  touches it.
+
+**Checks, ranked by cost (all but the last two need only stored arrays):** `ground` mean;
+arithmetic-mean re-aggregation of stored posteriors (veto); within-window vote
+consistency / entropy / persistence CNN vs RF; `best_epoch` table + wave-4 `test_curve`
+oracle bound; both-wrong enrichment for `bot_clip` / distance band; 12-input MLP under the
+CNN regime; per-goat cause in mm + nearest-neighbour explanations for the 103 decisions;
+Adler relative-entropy per frame / per 2.5 s; RF on 13 floor + 12 metric; ConvNeXt on
+`scale_removed` at R4 (5 GPU cells); HHA-style mm channels with a bit-depth control on the
+height channel (5–10 GPU cells) — the decisive representation test.
+
+**Manuscript ceiling sentences:** "With the best recipe the network and the twelve
+measurements extract the same identity from a single frame (18.4 vs 18.8 %); the network
+carries it in the outline (accuracy flat from 16 to 2 bits), the measurements in
+millimetres. The measurements pull ahead only under measurement discipline: refusing
+frames in which the body is clipped (+10 pp against +3 for the network, which is the more
+robust of the two on clipped frames) and integrating over 2.5 s (+14 against +7), because
+a measurement's error can be gated and averaged and a learned outline's cannot be shown
+to." Do not write "the CNN failed", "cannot compute millimetres", "gradient starvation" or
+"systematic errors" without the checks above.
+
