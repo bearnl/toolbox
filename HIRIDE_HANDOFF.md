@@ -3107,3 +3107,40 @@ commensurability table; `hiride_report.py` does not yet read the sequence JSONs,
 metric/fusion multi-shot columns are hand-composed from `sequence_R4_standard_*_gated.json`
 (`acc.metric.0`, `acc.geo.0`) and the R4 counterparts from `sequence_gated_best.json`.
 
+### 14.12 2026-09-11 — venue T-BIOM, wave 23 (modern encoder), the manuscript started
+
+**Author's decisions.** Reframe confirmed ("what carries discriminative information in depth
+video", two sides converging; depth opaque to human eyes is the PREMISE, cited). Venue:
+**IEEE T-BIOM** primary (evaluation-study genre: Hou 2023, Rosberg 2026; reproducibility
+policy; reviewers speak ISO 19795); fallbacks CVIU → Pattern Recognition → IEEE Access.
+`paper2_lit_audit/ESSENCE.md` rev 3 is the approved statement.
+
+**Wave 23 (`make_runs.py --wave 23`, `submit_wave23.sh`, commit 82172a8).** ConvNeXt-Tiny/
+ImageNet on `scale_removed`, depth, at R4_cross_session, R4_standard_walking and
+R4_standard_still, gap head and stripe/aug8/tf10, 5 seeds, `--track-test` (per-epoch test
+curve → bound on the within-session early-stopping cost), `--skip-existing`. 30 cells at %6,
+~15–30 min each, ~8–15 GPU-hours; afterany analysis = retag, collate, stats_final.json,
+tables.tex. Purpose: the "add a modern encoder" review comment, answered before it is
+made. Reading rule: if ConvNeXt lands in the AlexNet cluster (R4 13–20 %; standard Walking
+~14 %) the architecture objection closes; if it clears it, the paper reports that and the
+"reads the outline" scope narrows to the from-scratch network.
+
+**Manuscript.** `papers/paper-depth/submissions-TBIOM-2026/{main.tex, refs.bib, figs/}` on
+IEEEtran (journal). Drafted for the author's voice check: title, abstract, I Introduction
+(three beats; four audit-bounded contributions; three organising findings), II Related
+work (depth ID on BIWI; anthropometric soft biometrics; splits and attribution), III Data,
+protocol and measurement model (corpora; ladder incl. the field's rung; network and
+single-edit conditions; the twelve measurements — camera-frame, ground plane disclosed;
+gate, budget, decisions; statistics per ISO 19795). Sections IV–IX are structured stubs
+with the numbers to be prosed; Tables 1 (ladder) and 2 (commensurability) are filled.
+`refs.bib` holds 38 entries with the DOIs the audits verified; author lists marked
+"and others" and the ISO/Kwolek entries need completing from the DOI records before
+submission. The old `submissions-IEEE-on-Privacy/` is an archive of the rejected 2023
+paper; `ieeetj.cls` is not used. The `papers` repo is NOT committed by the agent — the
+author reviews and commits.
+
+**Next.** Author: push toolbox, `bash submit_wave23.sh` on Nibi, `bash collect_wave23.sh`
+next morning; read the PDF for voice. Agent: prose Sections IV–IX from §14.6/§14.10/§14.11
+once the voice is approved; the veto check (arithmetic-mean re-aggregation) before the word
+"systematic" enters Section VI; per-goat causes in mm for Section VIII.
+
