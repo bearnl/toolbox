@@ -476,12 +476,29 @@ WAVE22 = dict(
     seeds=[0, 1, 2, 3, 4],
 )
 
+WAVE23 = dict(
+    doc="A modern encoder at fixed protocol, before a referee asks (HIRIDE_HANDOFF 14.12). "
+        "ConvNeXt-Tiny with ImageNet weights on the re-centred, rescaled person -- the "
+        "condition that carries the cross-session signal -- at the ladder's R4 and at both "
+        "standard rungs, under the gap head and under the best cross-session recipe, 5 seeds. "
+        "ConvNeXt exists so far only on the full frame (wave 4), which at R4 measures a moved "
+        "room, not body geometry. If these land in the AlexNet cluster (13-20 % R4, 14 % "
+        "standard Walking) the architecture objection closes; if not, we learn it first. "
+        "--track-test stores the per-epoch test curve so the within-session early-stopping "
+        "cost can be bounded (09_cnn_failure_refute_REPRESENTATION G). 3 x 2 x 5 = 30 cells, "
+        "~15-30 min each on a 1g.10gb slice, ~8-15 GPU-hours. Every line --skip-existing.",
+    policies=[("R4_cross_session", ""), ("R4_standard_walking", ""), ("R4_standard_still", "")],
+    cells=[("scale_removed", "depth", ""),
+           ("scale_removed", "depth", "--head stripe --augment 8 --test-fuse 10")],
+    seeds=[0, 1, 2, 3, 4],
+)
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
                     choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-                             19, 20, 21, 22))
+                             19, 20, 21, 22, 23))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -565,6 +582,14 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 23:
+        for policy, extra in WAVE23["policies"]:
+            for cond, mod, flags in WAVE23["cells"]:
+                for seed in WAVE23["seeds"]:
+                    lines.append(" ".join(
+                        f"--policy {policy} --modality {mod} --arch convnext_tiny --init imagenet "
+                        f"--condition {cond} --seed {seed} {flags} {extra} "
+                        f"--track-test --skip-existing".split()))
     elif args.wave == 22:
         for policy, extra in WAVE22["policies"]:
             for cond, mod, flags in WAVE22["cells"]:
