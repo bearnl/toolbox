@@ -3046,3 +3046,64 @@ column still missing — `hiride_sequence.py --policy R4_standard_*` produces it
 accuracy.** The report's R4 rows carry no multi-shot value because the R4 cells predate
 `tracklet_scores`; `sequence_gated_best.json` holds the R4 whole-tracklet numbers instead.
 
+### 14.11 The field's protocol, aggregated — `sequence_R4_standard_*.json` (2026-09-11)
+
+`hiride_sequence.py --policy R4_standard_{walking,still}`, best recipe, `scale_removed`,
+12 metric columns, 50-way classifier, 28 probe people; gated = full-body frames only.
+
+| Walking, gated | decisions | CNN | metric | fusion |
+|---|---|---|---|---|
+| 1 frame | 2,933 | 16.87 | 22.28 | 26.91 |
+| 25 frames (2.5 s) | 103 | 22.14 [9.9, 36.2] | 33.79 [21.3, 47.0] | 42.33 [28.2, 57.6] |
+| whole recording | 28 | 25.00 | **41.43** | **47.14** |
+
+Paired at W = 25: fusion − metric +8.54 [−5.50, +23.30] (not resolvable); fusion − CNN
++20.19 [+10.17, +31.05]. Top-1/3/5 at W = 25: metric 33.8/54.6/71.5, fusion 42.3/71.5/80.6.
+Per-subject (fusion): 3 of 28 never, 2 always.
+
+| Walking, ungated | decisions | CNN | metric | fusion |
+|---|---|---|---|---|
+| 1 frame | 5,642 | 14.34 | 14.60 | 20.63 |
+| 25 frames | 211 | 20.28 | 22.18 | 30.05 |
+| whole recording | 28 | **23.57** | **23.57** | 34.29 |
+
+| Still, gated (98 % of frames whole-body) | decisions | CNN | metric | fusion |
+|---|---|---|---|---|
+| 1 frame | 3,753 | 23.90 | 36.77 | 35.33 |
+| 25 frames | 137 | 25.55 | 41.46 [25.1, 58.1] | 38.98 |
+| whole recording | 28 | 25.71 | **43.57** | 39.29 |
+
+Still, fusion − metric −2.48 [−17.89, +12.37]; CNN − metric −15.91 [−33.28, +0.57].
+Ungated Still is within 2 pp of gated everywhere (the gate removes 2 % of frames).
+
+**What this settles — the commensurability sentence the C3 audit demanded.**
+1. **Published multi-shot on this probe set: Munaro 42.9, Haque 4D-RAM 45.3, Karianakis
+   CNN-LSTM 45.7 / RTA 50.0 — and Haque's plain 3D-CNN + averaging 27.8.** Ours, same
+   protocol, whole recording: per-frame CNN averaged **25.0** (≈ Haque's plain CNN);
+   gate + twelve millimetre measurements averaged **41.4**; fusion **47.1** — inside the
+   band that recurrent attention and LSTM frame-weighting reach. The published numbers
+   also rest on 28 decisions (binomial SE ≈ 9 pp): no 5-pp difference in that literature
+   is resolvable, and neither is ours; say so.
+2. **Without the gate the CNN and the measurements are tied at every window (14.3/14.6 →
+   23.6/23.6).** The twelve measurements' entire advantage over the network on Walking is
+   the advantage of knowing which frames are invalid. With the gate: 41.4 vs 25.0.
+3. **On whole standing bodies (Still) the measurements lead from the first frame (36.8 vs
+   23.9) and the CNN gains nothing from integration (23.9 → 25.7):** standing frames are
+   near-identical, so there is nothing to average; the measurements still gain 7 pp
+   (segmentation jitter). Millimetres beat the outline by 13 pp per frame when the body
+   is whole; when it is clipped they are tied — the outline's proportions partly survive
+   clipping, an absolute stature does not (consistent with 09_cnn_failure_refute_
+   REPRESENTATION: the CNN is the more clipping-robust system).
+4. **Fusion's contribution lives on walking frames and is never resolvable at n = 28**
+   (+8.5 gated, +7.9 ungated at W = 25, intervals straddle zero); on Still it is −2.5. The
+   useful combination is frame VALIDITY, not a mixing weight (Lens 3, P-C1 in spirit).
+5. Metric on Still, single frame **36.8 %**, whole recording **43.6 %**: above Wu 2017's
+   ED+SKL Still (30.52 single / 39.38 five-shot) and Munaro's PCM Still (32.5).
+6. The 22 distractor classes cost the gated metric operating point ~9.5 pp against the
+   28-way R4 (43.30 → 33.79 at W = 25; 50.71 → 41.43 whole) — quote both, labelled by K.
+
+**For the paper:** Table D (single/multi-shot per cell) + these four JSONs compose the
+commensurability table; `hiride_report.py` does not yet read the sequence JSONs, so the
+metric/fusion multi-shot columns are hand-composed from `sequence_R4_standard_*_gated.json`
+(`acc.metric.0`, `acc.geo.0`) and the R4 counterparts from `sequence_gated_best.json`.
+
