@@ -2985,3 +2985,64 @@ a measurement's error can be gated and averaged and a learned outline's cannot b
 to." Do not write "the CNN failed", "cannot compute millimetres", "gradient starvation" or
 "systematic errors" without the checks above.
 
+### 14.10 Wave 22 collected 2026-09-11 — the field's protocol on our pipeline; ground plane settled
+
+**Ground plane: `ground` column mean = 0.0046.** The published metric features used the
+camera −Y axis as vertical on 99.5 % of frames (§12.3 was right, §13.14 wrong). Methods
+must say "camera-frame millimetres: unprojection cancels translation and standing
+distance; camera pitch is a residual". Recovering the plane means fixing `sibling()`
+(§13.16) and re-running every metric number — not planned.
+
+**Wave 22: 50/50 cells, analysis job clean, `tables.tex`/`report.md`/`stats_final.json`
+regenerated through the corrected keying (Table D exists).** Standard protocol = train on
+ALL 50 Training recordings (chance 2.00 %), test the 28 re-recorded subjects.
+
+| single frame | Walking probe | Still probe | R4 (28-way) | published, same probe set |
+|---|---|---|---|---|
+| CNN gap head, scale_removed | 7.56 (3.8×) | 13.72 (6.9×) | 13.62 (3.8×) | — |
+| CNN stripe/aug8/tf10, scale_removed | 14.34 ±2.9 (7.2×) | 23.92 ±2.3 (12×) | 18.36 (5.1×) | Karianakis CNN 25.4; Haque 3D-RAM 30.1 (gated frames) |
+| CNN full frame | 3.80 | 2.42 | 6.70 | — (room at chance) |
+| RGB stripe/aug8/tf10, scale_removed | 15.68 | 19.91 | 17.29 | Wu LOMO ~9 |
+| 12 metric, RF | 14.58 [10.1, 19.4] (7.3×) | **35.48 [22.5, 49.0] (17.7×)** | 19.04 | Wu ED+SKL Walking 24.47, Still 30.52; Munaro PCM Still 32.5 |
+| 12 metric, full-body frames | 22.16 [16.1, 28.3] | 35.57 | 28.06 | — |
+| 13-scalar floor | 2.99 (null 2.43) | 5.15 (null 2.27) | 5.35 | — |
+
+**Multi-shot (mean posterior over the whole recording, 28 decisions, `tracklet_acc`):** CNN
+best recipe Walking **27.14 %**, Still 27.86; gap head 11.43 / 15.00; RGB 17.86 / 20.00.
+Published multi-shot on the same probe set: Haque **plain 3D-CNN + average pooling 27.8 %**;
+4D-RAM (recurrent attention over the sequence) 45.3; Karianakis CNN-LSTM + avg 45.7, RTA
+50.0; Munaro PCM+skeleton 42.9. **Reading:** a per-frame CNN averaged over the recording
+gives 27–28 % in both Haque 2016 and here; the 45–50 % figures come from sequence models
+with ImageNet transfer and frame weighting/attention (and gated training frames). Our
+explicit validity gate + twelve millimetre features do that job with a physical rule: gated
+2.5-s metric 43.3 % (R4), gated whole-recording 50.7 % (R4, 28 decisions). The like-for-like
+number under the 50-way protocol (gated metric multi-shot on Walking/Still) is the one
+column still missing — `hiride_sequence.py --policy R4_standard_*` produces it (submitted
+2026-09-11 as `.seq22.sh` → `sequence_R4_standard_{walking,still}_{gated,ungated}.json`).
+
+**What the table settles.**
+1. **Still vs Walking is the clipping mechanism in one row.** Same model, same day-and-
+   clothes change: standing whole bodies (gate keeps 98 %) → CNN 23.9 / metric 35.5;
+   walking (49 % of frames eligible, 52 % of those whole) → 14.3 / 14.6. On Still the twelve
+   features EXCEED every hand-crafted number in the lineage.
+2. **Our single-frame numbers are below the field's on the field's protocol (14 vs 25–30),
+   and the gated metric single frame (22.2 [16.1, 28.3]) reaches their band** — their
+   single-shot numbers were on gated frames (Karianakis removed boundary/far frames).
+   Say this plainly; the mechanistic explanation is (i) no ImageNet transfer, (ii) ungated
+   test frames, (iii) a 2-D crop rather than point clouds/body-index geometry.
+3. **22 extra training identities did not lift the CNN's single-frame accuracy on the 28**
+   (14.34 at 1/50 vs 18.36 at 1/28, ~1 seed-sd; in ×chance terms 7.2 vs 5.1). Consistent
+   with "one recording per identity binds" (09_cnn_failure_refute_LEARNING D), not proof.
+   Lens-3 P-B4: CNN tracklet − single-frame gain under the standard protocol = +12.8 pp
+   (28 decisions, SE ≈ 8) vs +7.7 gated at R4.
+4. **Depth > RGB on Still by 4.0 pp with seed sd 1.8** — rgb−depth negative in all five
+   seeds; the first R4-type modality contrast in the campaign that is consistent seed by
+   seed (Walking +1.3 ±4.6, inconsistent).
+5. **The 13-scalar floor is at its null under the standard protocol** (2.99 vs null 2.43;
+   5.15 vs 2.27): nothing in the box geometry transfers across a session even with 50
+   training identities.
+
+**Table D `x chance` compares 1/50 rows with 1/28 rows — that is the fair axis, not raw
+accuracy.** The report's R4 rows carry no multi-shot value because the R4 cells predate
+`tracklet_scores`; `sequence_gated_best.json` holds the R4 whole-tracklet numbers instead.
+
