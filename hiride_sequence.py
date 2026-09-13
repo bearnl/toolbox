@@ -78,6 +78,18 @@ def windows(order, w):
     return [order[i:i + w] for i in range(0, len(order) - w + 1, w)]
 
 
+def window_logscore(prob, blk, agg):
+    """Log-score of one window: product rule (mean log posterior) or sum rule (log of the mean
+    posterior). The product rule with float16 posteriors lets one frame whose true-class
+    probability rounded to zero contribute log(1e-12) and veto the window; hiride_errors.py
+    measured that this suppressed the metric random forest's aggregated accuracy by ~5 pp at
+    W = 25 and ~16 pp at whole-recording (HIRIDE_HANDOFF 14.15), so the sum rule is offered
+    as a first-class alternative."""
+    if agg == "geo":
+        return np.log(prob[blk] + 1e-12).mean(0)
+    return np.log(prob[blk].mean(0) + 1e-12)
+
+
 def sequence_acc(prob, truth, rec, frame, w, agg="geo"):
     """Accuracy of one decision per window, windows taken within a recording."""
     ok, n = 0, 0
@@ -85,8 +97,7 @@ def sequence_acc(prob, truth, rec, frame, w, agg="geo"):
         m = np.flatnonzero(rec == r)
         m = m[np.argsort(frame[m])]
         for blk in windows(m, w):
-            p = (np.log(prob[blk] + 1e-12).mean(0) if agg == "geo"
-                 else prob[blk].mean(0))
+            p = window_logscore(prob, blk, agg)
             ok += int(p.argmax() == truth[blk[0]])
             n += 1
     return ok / max(n, 1), n
@@ -129,6 +140,11 @@ def main():
                          "deployment choice; the retained fraction is printed "
                          "and the resulting accuracy is NOT comparable to the "
                          "unrestricted headline.")
+    ap.add_argument("--agg", choices=("geo", "mean"), default="geo",
+                    help="window decision rule: 'geo' = product rule (mean log posterior, "
+                         "the rule behind every number up to 2026-09-13); 'mean' = sum rule "
+                         "(mean posterior), immune to the float16 veto that hiride_errors.py "
+                         "found suppressing the metric model (HIRIDE_HANDOFF 14.15).")
     ap.add_argument("--out", default=None)
     ap.add_argument("--out-name", default="sequence.json",
                     help="filename within --out. Gated and ungated runs must "
@@ -218,7 +234,7 @@ def main():
             tr_frame = np.asarray(man["frame"])[tr].astype(np.int64)
             for w in W:
                 for k, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
-                    a, n = sequence_acc(P, truth, rec, frame, w)
+                    a, n = sequence_acc(P, truth, rec, frame, w, args.agg)
                     acc[k][w].append(a)
                     if k == "cnn":
                         ndec[w].append(n)
@@ -236,7 +252,7 @@ def main():
                 pw = np.zeros((len(bte), p_cnn.shape[1]))
                 pw[:, rfw.classes_.astype(int)] = rfw.predict_proba(Xt)
                 acc["met_agg"][w].append(float((pw.argmax(1) == yte).mean()))
-                pc = np.stack([np.log(p_cnn[b] + 1e-12).mean(0) for b in bte])
+                pc = np.stack([window_logscore(p_cnn, b, args.agg) for b in bte])
                 acc["geo_agg"][w].append(
                     float(((pc + np.log(pw + 1e-12)).argmax(1) == yte).mean()))
             # per-DECISION record at the reporting window: correctness for the
@@ -253,7 +269,7 @@ def main():
                     m = np.flatnonzero(rec == r)
                     m = m[np.argsort(frame[m])]
                     for blk in windows(m, args.ci_window):
-                        lp = np.log(P[blk] + 1e-12).mean(0)
+                        lp = window_logscore(P, blk, args.agg)
                         t = int(truth[blk[0]])
                         cor.append(float(lp.argmax() == t))
                         rnk.append(int((lp > lp[t]).sum()) + 1)
@@ -383,7 +399,7 @@ def main():
         # whether it was gated and which features it used, or it is unreadable
         report["_meta"] = dict(policy=args.policy, modality=args.modality,
                                arch=args.arch, features=args.features,
-                               full_body=bool(args.full_body),
+                               full_body=bool(args.full_body), agg=args.agg,
                                invariance_max=args.invariance_max,
                                min_snr=args.min_snr, windows=W)
         path = os.path.join(args.out, args.out_name)

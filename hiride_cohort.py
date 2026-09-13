@@ -50,6 +50,10 @@ def main():
     ap.add_argument("--draws", type=int, default=3)
     ap.add_argument("--window", type=int, default=25)
     ap.add_argument("--full-body", action="store_true")
+    ap.add_argument("--agg", choices=("geo", "mean"), default="geo",
+                    help="window decision rule: product rule (geo, the historical default) or the "
+                         "arithmetic mean of posteriors, which is immune to the float16 veto that "
+                         "hiride_errors.py found suppressing the metric model (HIRIDE_HANDOFF 14.15).")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     Ks = [int(x) for x in args.cohorts.split(",")]
@@ -168,7 +172,9 @@ def main():
                         m = np.flatnonzero(rec_a == r)
                         m = m[np.argsort(frame_a[m])]
                         for blk in windows(m, args.window):
-                            ok += int(np.log(P[blk] + 1e-12).mean(0).argmax() == g[blk[0]])
+                            score = (np.log(P[blk] + 1e-12).mean(0) if args.agg == "geo"
+                                     else P[blk].mean(0))
+                            ok += int(score.argmax() == g[blk[0]])
                             n += 1
                     return ok / max(n, 1)
 
