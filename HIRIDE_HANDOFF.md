@@ -3232,3 +3232,83 @@ Outputs `errors_<arch>_R4_cross_session_<gate>.json` in results/.
 Cluster state 2026-09-13: wave-23 top-up 21822177 (+ analysis 21822178), `seq_cnxt`
 21822179, wave 24 21822181 (+ analysis 21822182); errors job not yet submitted.
 
+### 14.15 2026-09-13 — waves 23/24 complete, ConvNeXt operating point, error structure: two corrections
+
+**Wave 23 top-up:** all 30 cells at 5 seeds (six had hit the 2 h wall at epoch 45–47).
+Standard Walking ConvNeXt gap 19.19 ±0.70, stripe 20.64 ±1.23 → whole-recording 37.9 / 44.3.
+
+**Wave 24 — what the pretrained encoder reads (ConvNeXt stripe/aug8/tf10, R4, 5 seeds):**
+normalised depth 25.92 ±0.99 [19.2, 33.0]; size kept 25.72 ±1.41; **2-bit depth 23.30 ±1.33;
+normalised silhouette 23.37 ±1.36; interior only 23.84 ±1.86.** Reading: the outline is the
+dominant carrier for the pretrained encoder too (silhouette = 2-bit, 23.3–23.4), and the
+depth VALUES add ~2.5 pp on top — consistent across seeds (sd ~1–1.4) but far inside the
+subject-cluster intervals, so "the pretrained encoder makes a small additional use of the
+interior" is the ceiling wording; interior-only at 23.8 says the interior alone carries
+nearly as much as the outline alone for ConvNeXt (for AlexNet best recipe: interior 17.9,
+silhouette 19.5, depth 18.4 — all level). Size normalisation is neutral for both encoders.
+
+**ConvNeXt operating point (`sequence_cnxt_*`):**
+| R4 gated | W=1 (2,933) | W=25 (103) | whole (28) |
+|---|---|---|---|
+| ConvNeXt | 29.55 | **48.16 [33.2, 63.2]** | 55.71 |
+| 12 measurements | 28.86 | 43.30 [30.3, 56.1] | 50.71 |
+| fusion | 39.28 | **58.64 [43.5, 73.2]** | 62.14 |
+Paired W=25: fusion−metric +15.34 [−0.84, +31.41]; CNN−metric +4.85 [−12.6, +22.6];
+fusion−CNN +10.49 [+3.0, +18.4]. Top-1/3/5: CNN 48.2/74.0/82.3; metric 43.3/66.8/77.5;
+fusion **58.6/84.1/89.7**. Per-subject (fusion): median 71 %, 2 never, 4 always.
+Answer-when-sure 0.80: 58 % coverage at 73.7 %. Ungated: CNN 25.9 → 42.4 [29.0, 56.2] → 47.1;
+metric 18.8 → 30.1 → 26.4; fusion 30.8 → 45.0 → 46.4; fusion−metric +14.9 [+3.6, +25.9]
+RESOLVABLE. Standard Walking gated: CNN 22.6 → 35.7 → 43.8; metric 22.2 → 33.7 → 42.0;
+fusion 32.5 → **51.0 [35.0, 67.8] → 59.8**; fusion−metric +17.2 [+0.6, +34.0] resolvable;
+ungated CNN whole 45.5. Standard Still gated: CNN 27.8 → 31.2 → 35.0; metric 36.8 → 41.5 →
+43.6; fusion 40.6 → 45.3 → 47.1 (CNN−metric −10.2 [−26.6, +5.3]). **Pattern confirmed:** on
+whole standing bodies the measurements lead the pretrained network; on walking frames the
+network is the more robust reader; gated single-frame parity (29.6 vs 28.9) reappears for
+the pretrained encoder on whole bodies; fusion is now a real, mostly resolvable gain
+(+15 pp), unlike the AlexNet fusion (+3.7, unresolvable).
+
+**Error structure (`hiride_errors.py`, `errors_*.json`) — two corrections to the record:**
+1. **The float16 product-rule veto is REAL, and it hit the MEASUREMENTS, not the network.**
+   RF vote fractions are exactly zero for the true class whenever no tree votes it; the
+   product rule (mean log posterior, floor 1e-12) then vetoes the window. Wrong metric
+   windows carry 2.2 (gated) / 5.9 (ungated) vetoing frames on average; CNN windows 0.03–0.9.
+   Arithmetic-mean aggregation on the SAME decisions: metric gated W=25 **43.30 → 48.16**,
+   whole 50.71 → 54.29; ungated W=25 30.14 → 34.98, **whole 26.43 → 42.86**; fusion (ConvNeXt)
+   gated whole 62.1 → 72.1. The CNN is unchanged (28.16 → 27.57). CONSEQUENCES: (a) every
+   quoted aggregated measurement number (43.3, 50.7, the cohort curve, fig 7/8) is
+   conservative by the rule, not by the data; (b) **the "ungated curve peaks at 30 % and
+   falls" sentence (V.C draft, §13.12) is an artefact of the veto** — under the sum rule the
+   ungated metric rises to 35 % at W=25 and 43 % whole; the gate still adds +13 / +11 pp.
+   Kittler et al. 1998's sum-rule robustness is the citation. DECISION for the author:
+   switch all aggregation to the arithmetic mean (`--agg mean`) and regenerate
+   sequence/cohort JSONs + figs 7–8, or keep the product rule and report the sum rule beside
+   it. Recommendation: switch — it is the standard rule, `tracklet_scores` already uses it,
+   and the floor is an implementation artefact.
+2. **"Systematic errors" in the strong sense is NOT supported.** Wrong CNN windows are no
+   more internally consistent than wrong metric windows (modal share 0.41 vs 0.36, persist
+   0.38 vs 0.26, lag-1 agreement 0.48 vs 0.45; ConvNeXt 0.36/0.34/0.40 — LESS persistent than
+   the measurements). What differs: (i) the from-scratch CNN's i.i.d. plurality ceiling is
+   low (30.9 % at W=25) and its measured curve sits AT the ceiling (28.2) — its confusions are
+   concentrated at the CLASS level (A → B consistently), which is systematicity in the
+   confusion matrix, not frame-to-frame persistence; the measurements' ceiling is high (51.5)
+   and the measured curve sits 8 pp BELOW it — their errors ARE within-window correlated (the
+   distance bias); (ii) confuser stability across seeds: CNN 29–36 % of recordings (AlexNet),
+   57–61 % (ConvNeXt); measurements 86–89 % — the measurements' confusions are properties of
+   the data (nearest neighbours in mm), the network's of the fit. Wording ceiling: "the
+   network's confusions are concentrated on a few identities and change with initialisation;
+   the measurements' are stable nearest-neighbour confusions whose errors are correlated
+   within a walk by the distance bias". Do NOT write "the same wrong identity frame after
+   frame".
+3. Both-wrong enrichment (ungated): 54 % of both-wrong frames have the body clipped vs 32 %
+   of either-right; 56 % vs 40 % outside the training distance band — the shared hard core IS
+   enriched for clipped and out-of-range frames (Lens 3 P-C1 supported at the frame level).
+   Either-right sits 4–5 pp below independence (mild positive dependence).
+4. Early stopping cost (ConvNeXt `--track-test`, 5 seeds): mean 1.70 pp (0.4–4.1) between
+   the within-session-selected epoch and the best test epoch — small; Lens 2 mechanism A is
+   bounded, not important.
+
+**Manuscript consequences:** rewrite V.C (drop "peaks and falls"; report both rules or switch);
+write VI from the above; abstract's third finding → the pretrained encoder; Table 2 gets the
+gated ConvNeXt/fusion rows (59.8 whole-walk); Section VI's "systematic" replaced by the
+ceiling wording. Essence rev 4 written 2026-09-13.
+

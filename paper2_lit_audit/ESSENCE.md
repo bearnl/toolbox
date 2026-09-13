@@ -57,3 +57,42 @@ the network is the clipping-robust reader, the measurements the precise and expl
 whether the pretrained encoder reads the outline or the interior is wave 24's question; the
 ConvNeXt gated / fusion numbers (`submit_sequence.sh`) set the operating point. Handoff §14.13.
 
+## Rev 4 — 2026-09-13, after waves 23/24, the ConvNeXt operating point and the error-structure check
+
+**The meeting point, restated.** Both sides reach the field's band, and each carries identity a
+different way. The from-scratch network and the twelve measurements extract the same identity
+from a single frame (18.4 vs 18.8 %); an ImageNet-pretrained ConvNeXt on the same normalised
+person extracts more (25.9 %), and on whole bodies it and the measurements are level again
+(29.6 vs 28.9 %). What the pretrained encoder reads is still, dominantly, the outline: 2-bit
+depth and the binary silhouette both give 23.3 %, the interior alone 23.8 %, full-precision
+depth 25.9 % — a seed-consistent 2.5 pp from the depth values that the subject-level
+intervals cannot resolve. Under the ladder's R4, gated 2.5 s: ConvNeXt 48.2 % [33.2, 63.2],
+measurements 43.3 % (48.2 % under the arithmetic-mean rule), fusion **58.6 % [43.5, 73.2]**,
+top-3 84 %; whole recording 55.7 / 50.7 (54.3) / 62.1 (72.1). Under the field's protocol,
+gated whole walk: fusion 59.8 %, above the published 43–50 %; ungated ConvNeXt alone 45.5 %.
+On standing whole bodies the measurements lead the pretrained network (41.5 vs 31.2 % at
+2.5 s); on walking frames the network is the more clipping-robust reader; fusion of the two is
+a real gain (+15 pp over the measurements, resolvable in two of three settings) where the
+AlexNet fusion was not.
+
+**Two corrections the error-structure check forces.** (1) The product-rule aggregation with
+float16 posteriors vetoed the *measurements'* windows: on identical decisions the arithmetic
+mean gives 48.2 % instead of 43.3 % at 2.5 s gated and 42.9 % instead of 26.4 % whole-recording
+ungated. Every aggregated measurement number in the record is conservative by the rule; the
+"ungated curve peaks and falls" reading was the veto, not the bias. Recommendation: switch all
+aggregation to the sum rule (Kittler 1998) and regenerate figs 7–8. (2) "Systematic errors" in
+the strong sense is not supported: wrong network windows are no more internally consistent than
+wrong measurement windows. What is supported: the from-scratch network's confusions are
+concentrated on a few identities (its i.i.d. plurality ceiling is only 31 %) and change with
+initialisation (a stable confuser in 29–36 % of recordings vs 86–89 % for the measurements);
+the measurements' errors are within-walk correlated by the distance bias (measured 8 pp below
+their i.i.d. ceiling). Early stopping on within-session validation cost the pretrained network
+1.7 pp. Both models fail together on clipped and out-of-range frames (54 vs 32 %).
+
+**Closing sentence of the paper.** Usable is reached by both readers — 48 % from the network,
+43–48 % from twelve lengths, 59 % together, from 2.5 s of depth on 28 people. Explainable is the
+measurements' property alone: every input a length, every refusal a stated geometric condition,
+every unidentified person assignable a cause in millimetres. What carries identity in consumer
+depth video is body geometry seen as an outline; the depth values add a little to a pretrained
+network and everything to a tape measure.
+
