@@ -3322,3 +3322,11 @@ decision: Discussion, Conclusion, Reproducibility, authors. `--agg {geo,mean}` a
 `hiride_sequence.py` and `hiride_cohort.py` (commit 75cc29b); regenerate with
 `submit_sequence.sh` after adding `--agg mean` and re-render figs 7–8 if the switch is made.
 
+**DECISION 2026-09-13 (author): aggregation switches to the SUM RULE (`--agg mean`).** Jobs
+21847728 (`sequence_cnxt-mean_*`) and 21847729 (`sequence_alexnet-mean_*`) regenerate the six
+sequence JSONs per encoder under the arithmetic mean. Still to regenerate under the same rule:
+the cohort curve (`hiride_cohort.py --agg mean`, AlexNet best recipe, 12 draws) and figs 7–8;
+then V.C / VI / abstract / Table 2 numbers move to the sum rule with the product rule reported
+once as the check that found the veto. `tracklet_acc` in `results_*.json` already IS the sum
+rule, so Table D's multi-shot column needs no change.
+
