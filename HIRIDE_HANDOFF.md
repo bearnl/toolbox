@@ -3207,3 +3207,28 @@ convnext_tiny/stripe/aug8/tf10 cnxt`, `bash submit_wave24.sh`; rsync. **Next (ag
 essence rev 4 and the abstract/intro/Section VI rewrite from the ConvNeXt gated, fusion and
 wave-24 numbers; `hiride_report.py` Table D already carries the ConvNeXt rows.
 
+### 14.14 2026-09-13 — while waves 23/24 run: Sections IV, V, VII drafted; the error-structure script
+
+`papers/paper-depth/submissions-TBIOM-2026/main.tex` now carries prose for IV (ladder with the
+matched-size decomposition of the floor — 89.4 → 80.0 → 31.8 → 17.7 → 5.4 — and the adjacency
+table; TVRID and in-house replication; attribution; precision axis), V (twelve lengths on the
+ladder; clipping/drift/gate; observation budget with the two controls — ungated peak, feature
+averaging; per-person and cohort; the field's protocol incl. ConvNeXt rows; modality with the
+segmenter control) and VII (negative-results table, ten rows). Tables 3–4 are built
+programmatically from the regenerated `tables.tex`; 10 pages on IEEEtran, all references
+resolved. NOT drafted: VI (convergence — waits for `submit_sequence.sh cnxt` and wave 24),
+VIII Discussion, IX Conclusion, and the abstract's third finding, which is true of the
+from-scratch network only (§14.13). The "5–9× inflation everywhere" phrase from the essence
+was NOT carried into the paper: the record gives 4.6–7.4× (TVRID), 5.0× (floor) and 1.6×
+(full-frame network); the paper states each corpus's own numbers.
+
+`hiride_errors.py` + `submit_errors.sh` (commit 2f62a27): the stored-posterior checks that
+license "systematic" — product rule vs arithmetic mean (float16 veto), vote consistency of
+wrong windows, lag-k agreement, i.i.d. plurality ceiling, confuser stability across seeds,
+both-wrong enrichment on clipped / out-of-band frames, early-stopping cost from
+`--track-test` curves — for the AlexNet and ConvNeXt best recipes at R4, gated and ungated.
+Outputs `errors_<arch>_R4_cross_session_<gate>.json` in results/.
+
+Cluster state 2026-09-13: wave-23 top-up 21822177 (+ analysis 21822178), `seq_cnxt`
+21822179, wave 24 21822181 (+ analysis 21822182); errors job not yet submitted.
+
