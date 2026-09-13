@@ -493,12 +493,34 @@ WAVE23 = dict(
     seeds=[0, 1, 2, 3, 4],
 )
 
+WAVE24 = dict(
+    doc="Does the PRETRAINED network read the outline too? Wave 23 put ConvNeXt-Tiny/ImageNet "
+        "on the normalised person at 25.9 % single-frame and 49.3 % whole-recording at R4 -- "
+        "double the from-scratch AlexNet and level with the gated measurements -- so the "
+        "attribution suite's 'reads the outline, not the depth values' (bits axis; silhouette "
+        "= depth) is now scoped to AlexNet until it is measured for ConvNeXt. Four single-edit "
+        "conditions under the best recipe at R4: the normalised silhouette (outline only), "
+        "2-bit depth (four levels over 0-6 m; the whole body inside one), interior only (rim "
+        "eroded), and the re-centred person with size kept. Reading rule fixed in advance: "
+        "silhouette ~ 2-bit ~ 16-bit => the pretrained network reads the outline as well and "
+        "Section VI's claim stands for both encoders; depth > silhouette by more than the seed "
+        "sd => the pretrained encoder uses interior depth (LidarGait's regime) and the paper "
+        "says so. 4 x 5 = 20 cells, ~20-30 min each, ~8-10 GPU-hours, 4 h wall. --skip-existing.",
+    policies=[("R4_cross_session", "")],
+    cells=[("sil_scaled", "depth", ""),
+           ("scale_removed", "depth", "--bits 2"),
+           ("interior_only", "depth", ""),
+           ("person_centred", "depth", "")],
+    recipe="--head stripe --augment 8 --test-fuse 10",
+    seeds=[0, 1, 2, 3, 4],
+)
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
                     choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-                             19, 20, 21, 22, 23))
+                             19, 20, 21, 22, 23, 24))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -582,6 +604,14 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 24:
+        for policy, extra in WAVE24["policies"]:
+            for cond, mod, flags in WAVE24["cells"]:
+                for seed in WAVE24["seeds"]:
+                    lines.append(" ".join(
+                        f"--policy {policy} --modality {mod} --arch convnext_tiny --init imagenet "
+                        f"--condition {cond} --seed {seed} {flags} {WAVE24['recipe']} {extra} "
+                        f"--skip-existing".split()))
     elif args.wave == 23:
         for policy, extra in WAVE23["policies"]:
             for cond, mod, flags in WAVE23["cells"]:

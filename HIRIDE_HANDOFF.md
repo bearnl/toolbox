@@ -3144,3 +3144,66 @@ next morning; read the PDF for voice. Agent: prose Sections IV–IX from §14.6/
 once the voice is approved; the veto check (arithmetic-mean re-aggregation) before the word
 "systematic" enters Section VI; per-goat causes in mm for Section VIII.
 
+### 14.13 Wave 23 collected 2026-09-13 — the pretrained encoder clears the band; the "convergence" moves
+
+**24 of 30 cells landed** (Walking gap head 1/5; Still gap head 4/5; Walking stripe 4/5 —
+the standard rungs train on 1.8× the frames and ConvNeXt with `--track-test` exceeded the
+2 h wall on some tasks; `collect_wave23.sh`'s `sacct -S now-24hours` missed jobs older than
+a day — later scripts use a 7-day window). Resubmitting the whole array with `--time=4:00:00`
+is safe: `--skip-existing` makes the 24 finished cells exit at once.
+
+**ConvNeXt-Tiny/ImageNet on `scale_removed` (single frame; whole-recording `tracklet_acc`,
+28 decisions, ungated):**
+
+| rung | gap head | stripe/aug8/tf10 | AlexNet stripe/aug8/tf10 (same cells) |
+|---|---|---|---|
+| R4 cross-session (28-way) | 24.89 ±0.81 [18.1, 32.0] → 41.43 | **25.92 ±0.99 [19.2, 33.0] → 49.29** | 18.36 ±3.52 [12.2, 25.2] → 25.00 |
+| standard Walking (50-way) | 18.20 (n=1) → 28.57 | 20.76 ±1.35 (n=4) → **47.32** | 14.34 → 27.14 |
+| standard Still (50-way) | 31.39 ±1.95 (n=4) → 38.39 | 28.10 ±0.75 → 37.86 | 23.92 → 27.86 |
+
+**The reading rule (§14.12) fires on its second branch.** The pretrained encoder does NOT land
+in the AlexNet cluster: +7.6 pp single-frame at R4 with a fifth of the seed variance, and it
+roughly doubles the whole-recording number (49.3 vs 25.0) — reaching, with no temporal model
+and no gate, the 45–50 % that 4D-RAM / CNN-LSTM / RTA report and the gated whole-recording
+measurements (50.7 %). Under the field's protocol: 47.3 % whole-walk, inside the published
+band, vs the from-scratch network's 27.1. So the architecture objection is closed in the
+other direction: **the from-scratch AlexNet's deficit was a representation-learning deficit
+that ImageNet pretraining removes** (Karianakis's split-rate transfer said as much in 2018).
+The full frame stays at the room's level for ConvNeXt too (8.45 %): pretraining does not
+rescue an input whose signal is the room.
+
+**What this does to the argument.**
+1. Single-frame "parity" (18.4 vs 18.8) was parity between the from-scratch network and the
+   measurements. Against the pretrained network the measurements are BEHIND on all frames
+   (18.8 vs 25.9 ungated) and level only after gating (28.1 gated single vs 25.9 ungated;
+   ConvNeXt gated unknown — `submit_sequence.sh convnext_tiny/stripe/aug8/tf10 cnxt`). On
+   standing whole bodies (Still) the measurements still lead per frame (36.8 vs 31.4) and per
+   recording (43.6 vs 38.4); on walking, clipped frames the pretrained network is far more
+   robust (single 20.8 vs 14.6; whole 47.3 vs 23.6 ungated, 41.4 gated). **Pattern: the
+   network's advantage is robustness to clipping; the measurements' advantage is precision on
+   whole bodies and explainability.** The gate remains the measurements' lever; it is no
+   longer their unique route to the band.
+2. "Reads the outline, not the depth values" is MEASURED for AlexNet only (bits axis,
+   silhouette ≈ depth). Whether the pretrained encoder uses interior depth is the open
+   question Section VI now hinges on → **wave 24** (`make_runs.py --wave 24`,
+   `submit_wave24.sh`): ConvNeXt best recipe at R4 on `sil_scaled`, `scale_removed --bits 2`,
+   `interior_only`, `person_centred`, 5 seeds, 20 cells, 4 h wall. Reading rule: silhouette
+   ≈ 2-bit ≈ 16-bit → outline for both encoders; depth > silhouette by more than seed sd →
+   the pretrained encoder reads interior depth (LidarGait's regime) and the paper says so.
+3. Manuscript: the abstract's "the network and the measurements extract the same identity
+   from a single frame" and "the measurements pull ahead only because a measurement can be
+   refused" are true of the from-scratch network and must be rewritten once the ConvNeXt
+   gated/fusion numbers land. The two-sided frame survives — Side A now ends at the
+   pretrained network's 26 % / 49 %, Side B at the measurements' 28 % gated / 51 % gated —
+   and the honest closing is: usable is reached by both; explainable is the measurements'
+   property; the pretrained network is the more clipping-robust reader, the measurements
+   the more precise one on whole bodies; fusion of the two is the next number to read.
+4. Every `--track-test` cell stores `test_curve`: max(test_curve) − test_curve[best_epoch]
+   bounds what within-session early stopping cost (09_cnn_failure_refute_REPRESENTATION G)
+   — compute from `results_*.json` when the missing seeds land.
+
+**Next (author):** push; on Nibi pull, resubmit wave 23 at 4 h, `bash submit_sequence.sh
+convnext_tiny/stripe/aug8/tf10 cnxt`, `bash submit_wave24.sh`; rsync. **Next (agent):**
+essence rev 4 and the abstract/intro/Section VI rewrite from the ConvNeXt gated, fusion and
+wave-24 numbers; `hiride_report.py` Table D already carries the ConvNeXt rows.
+

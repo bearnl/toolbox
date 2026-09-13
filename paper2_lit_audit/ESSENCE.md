@@ -43,3 +43,17 @@ Biometric evaluation study is the venue's native genre (Hou 2023; Rosberg 2026);
 ## Author's decisions on record
 
 2026-09-09: IEEE T-Privacy rejected the 2023 paper; wave 22 approved and run; keep "HI-RIDE"; in-house participants all consented; IAS-Lab no response → TVRID closes external validity. 2026-09-10: reframe to "what carries discriminative information", two sides converging, depth privacy-preserving for human eyes as premise. 2026-09-11: T-BIOM primary; wave 23 approved; `main.tex` started on IEEEtran in `papers/paper-depth/submissions-TBIOM-2026/`.
+
+## Addendum 2026-09-13 — wave 23 changes the meeting point (rev 4 pending)
+
+The modern-encoder control did not land in the AlexNet cluster: ConvNeXt-Tiny/ImageNet on the
+normalised person reaches 25.9 % [19.2, 33.0] single-frame and 49.3 % whole-recording at R4,
+and 47.3 % whole-walk under the field's protocol — the published band, with no temporal
+model and no gate. "Single-frame parity" and "the measurements pull ahead only via the gate"
+hold for the from-scratch network; against the pretrained one the measurements are behind on
+all frames, level after gating, ahead on standing whole bodies (36.8 vs 31.4), and far behind
+on clipped walking frames. Rev 4 will restate the convergence as: both sides reach the band;
+the network is the clipping-robust reader, the measurements the precise and explainable one;
+whether the pretrained encoder reads the outline or the interior is wave 24's question; the
+ConvNeXt gated / fusion numbers (`submit_sequence.sh`) set the operating point. Handoff §14.13.
+
