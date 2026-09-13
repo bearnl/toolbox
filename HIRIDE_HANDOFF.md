@@ -3312,3 +3312,13 @@ write VI from the above; abstract's third finding → the pretrained encoder; Ta
 gated ConvNeXt/fusion rows (59.8 whole-walk); Section VI's "systematic" replaced by the
 ceiling wording. Essence rev 4 written 2026-09-13.
 
+**Draft 3 (2026-09-13, `submissions-TBIOM-2026/main.tex`, 11 pp):** Section VI written from
+§14.15 (meeting point, what the pretrained encoder reads incl. Table `tab:cnxt`, why the
+from-scratch network stopped, error structure with the veto and the ceiling wording, what
+separates the readers); abstract, introduction finding 3, V.C and Table 2 rewritten around the
+pretrained encoder; the "ungated peaks and falls" sentence withdrawn. Numbers in V and the
+figures still use the product rule; VI reports both rules. Pending the author's aggregation
+decision: Discussion, Conclusion, Reproducibility, authors. `--agg {geo,mean}` added to
+`hiride_sequence.py` and `hiride_cohort.py` (commit 75cc29b); regenerate with
+`submit_sequence.sh` after adding `--agg mean` and re-render figs 7–8 if the switch is made.
+
