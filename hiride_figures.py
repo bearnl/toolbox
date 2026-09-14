@@ -518,8 +518,8 @@ def fig_cohort(path, out):
     # overlapping translucent fills spanned most of the panel and buried the
     # very lines they qualify. Whiskers carry the same min-max and stay legible;
     # a small multiplicative x-offset separates the arms on a log axis.
-    for i, (arm, colour, lab) in enumerate((("cnn_w", "#7f7f7f", "CNN"),
-                                            ("met_w", DEPTH_C, "metric features"),
+    for i, (arm, colour, lab) in enumerate((("cnn_w", "#7f7f7f", "network"),
+                                            ("met_w", DEPTH_C, "measurements"),
                                             ("geo_w", "#9467bd", "fusion"))):
         ys = np.array([blob[str(k)]["mean"].get(arm, float("nan")) for k in Ks])
         lo = np.array([100 * min(blob[str(k)]["draws"].get(arm, [float("nan")]))

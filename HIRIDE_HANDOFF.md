@@ -3426,3 +3426,42 @@ beyond (venue_fit_audit.md); draft 4 compiles to 11 pages.
 fits, ≤ 2 h; 0 GPU-hours); rsync `results/errors_*_mean.json results/sumrule/
 results/figs_sumrule/`. Then: Fig 8 swap, cohort numbers in V.D, consistency numbers in
 VI.D, authors → draft 5.
+
+### 14.17 2026-09-14 — cohort curve and error structure under the sum rule; draft 5
+
+**Cohort curve, sum rule** (job 21914765; the first attempt 21876312 computed everything and
+died at the final `json.dump` because `--out` did not exist — `hiride_cohort.py` now creates
+it after argument parsing, commit e97a7d9). AlexNet best recipe, R4 gated, W=25, 12 draws:
+| K | chance | measurements @W (spread) | network @W | fusion @W (upper bound) | retrained network | retrained fusion |
+|---|---|---|---|---|---|---|
+| 4 | 25.0 | **85.3** (36.4) | 67.6 | 81.0 (55.4) | — | — |
+| 7 | 14.3 | **73.5** (28.6) | 56.1 | 75.7 (25.0) | 36.7 | 61.6 |
+| 10 | 10.0 | **65.0** (15.8) | 54.8 | 74.3 (33.0) | — | — |
+| 14 | 7.1 | **58.1** (27.1) | 38.2 | 60.0 (28.5) | 31.9 | 62.7 |
+| 21 | 4.8 | **52.6** (22.0) | 34.2 | 53.6 (18.6) | 24.9 | 51.8 |
+| 28 | 3.6 | **48.2** | 27.6 | 47.8 | — | — |
+Measurements' margin over chance 3.4× → 13.5×. Retrained fusion with the from-scratch network
+is below or level with the measurements alone at every K where wave 18 exists (61.6 / 62.7 /
+51.8 vs 73.5 / 58.1 / 52.6) — consistent with V.C (fusion−metric −1.4 pp). The fusion curve in
+Fig 8 is the 28-class network restricted to the enrolled columns = upper bound; the caption
+says so. OPEN (minor): `cohort.json` gives the K=28 fusion as 47.8 while the sequence file
+gives 46.8 for the same cell and rule — the two scripts fuse differently (per-seed fusion
+averaged vs seed-averaged posteriors fused, to be checked); the manuscript quotes the sequence
+number and does not quote the cohort's K=28 fusion.
+
+**Error structure, sum rule** (job 21876311, `errors_*_R4_cross_session_*_mean.json`, four
+files). AlexNet gated W=25 wrong windows: network modal share 0.41 / persistence 0.40 vs
+measurements 0.35 / 0.34 (product-rule set was 0.41/0.38 vs 0.36/0.26); ConvNeXt 0.36 / 0.36.
+Ceilings unchanged (rule-free). VI.D updated; the red todo removed.
+
+**Figures.** Figs 7 and 8 in the submission are LOCAL renders (scratch venv) from the local
+JSONs with the renamed legend (`network / measurements / fusion`, fig_cohort labels renamed
+this session); the cluster's `figs_sumrule/` renders are identical in data but Fig 8 there
+carries the old labels. Nothing in a figure is computed locally — the scripts only read JSONs.
+
+**Draft 5** (`submissions-TBIOM-2026/main.tex`, 12 pages): every number is the sum rule;
+V.D and VI.D filled; Fig 8 caption states the upper bound. Red todos left: authors /
+affiliations / funding, the in-house corpus release policy, the archive DOI. The 10-page
+target (T-BIOM regular, MOPC beyond) needs content cuts the author must choose; candidates:
+Fig 2 and Fig 4 (their numbers are in Tables 1 and 4), the conditions panel Fig 6, Related
+Work and Discussion trims.
