@@ -426,7 +426,7 @@ def fig_operating_point(paths, out):
     """
     import json as _json
     fig, ax = plt.subplots(figsize=(7.6, 4.8))
-    ARMS = (("cnn", "#7f7f7f"), ("metric", DEPTH_C), ("geo", "#9467bd"))
+    ARMS = (("cnn", "network", "#7f7f7f"), ("metric", "measurements", DEPTH_C), ("geo", "fusion", "#9467bd"))
     drawn, ticks, labels = False, [], []
     for pi, path in enumerate(paths):
         try:
@@ -446,13 +446,13 @@ def fig_operating_point(paths, out):
         # whole-tracklet (w=0) is placed just past the largest real window
         xmax = max(w for w in W if w > 0)
         xs = [xmax * 2 if w == 0 else w for w in W]
-        for arm, colour in ARMS:
+        for arm, shown, colour in ARMS:
             ys = [100 * rec["acc"][arm][str(w)] for w in W]
             drawn = True
             ax.plot(xs, ys, marker="o" if pi == 0 else "s",
                     ls="-" if pi == 0 else "--", color=colour, lw=1.9, ms=5,
                     markerfacecolor=colour if pi == 0 else "none",
-                    label=f"{arm}  {'gated' if gated else 'all frames'}")
+                    label=f"{shown}  {'gated' if gated else 'all frames'}")
         if pi == 0:
             ticks = list(xs)
             labels = [("all" if w == 0 else str(w))

@@ -10,17 +10,20 @@ on every frame of a clip, which integration cannot average away -- while the mea
 errors are partly independent and do average. Two measurements must exist before that
 sentence is licensed, and this script makes them from stored arrays without training:
 
-  1. The veto. hiride_train.py stores posteriors as float16 and hiride_sequence.py
-     aggregates with the product rule (mean log posterior, floor 1e-12). One frame whose
-     true-class probability rounded to zero contributes log(1e-12) ~ -27.6 against typical
-     per-frame log posteriors of -1 to -5 and can veto the whole window. Every window is
-     therefore decided twice, by the product rule and by the arithmetic mean of posteriors,
-     and the number of vetoing frames is counted. If the arithmetic mean recovers accuracy,
-     the flat integration curve was partly an artefact of the rule, not of the network.
+  1. The veto. hiride_train.py stores posteriors as float16 and the product rule (mean log
+     posterior, floor 1e-12) was the first aggregation rule. One frame whose true-class
+     probability rounded to zero contributes log(1e-12) ~ -27.6 against typical per-frame
+     log posteriors of -1 to -5 and can veto the whole window. Every window is therefore
+     decided twice, by the product rule and by the arithmetic mean of posteriors, and the
+     number of vetoing frames is counted. The arithmetic mean recovered the forest's
+     accuracy (HIRIDE_HANDOFF 14.15), and the sum rule became the paper's decision rule.
   2. Vote consistency. Within a window the model gets wrong, do the per-frame decisions
      concentrate on one wrong identity (modal share high, vote entropy low, the window's
      decision persisting frame after frame) or spread (noise-like)? Reported for the CNN,
-     the forest and their fusion, split by whether the window decision was right.
+     the forest and their fusion, split by whether the window decision was right. Which
+     rule decides the window, and so which windows count as wrong, which decision the
+     persistence is measured against and which score ranks the true class, is --agg
+     ('geo' or 'mean'); the accuracy table always shows both rules side by side.
 
 Also reported, because each bounds a sentence in Section VI: the lag-k agreement between
 wrong per-frame decisions within a recording; the i.i.d. ceiling -- the accuracy W frames
@@ -58,8 +61,8 @@ def log_aggregate(P, blk, rule):
     return np.log(P[blk].mean(0) + 1e-12)
 
 
-def window_rows(P, truth, rec, frame, w):
-    """One record per window: decisions under both rules and the vote-consistency statistics."""
+def window_rows(P, truth, rec, frame, w, rule):
+    """One record per window: decisions under both rules; persistence and the true class's rank under `rule`."""
     out = []
     for r in np.unique(rec):
         m = np.flatnonzero(rec == r)
@@ -70,14 +73,13 @@ def window_rows(P, truth, rec, frame, w):
             counts = np.bincount(votes, minlength=P.shape[1])
             f = counts[counts > 0] / float(len(blk))
             entropy = float(-(f * np.log(f)).sum() / np.log(len(blk))) if len(blk) > 1 else 0.0
-            lp_geo = log_aggregate(P, blk, "geo")
-            d_geo = int(lp_geo.argmax())
-            d_mean = int(log_aggregate(P, blk, "mean").argmax())
+            lp = {rl: log_aggregate(P, blk, rl) for rl in ("geo", "mean")}
+            d = {rl: int(lp[rl].argmax()) for rl in lp}
             out.append(dict(rec=str(r), subject=str(r).split("|")[1], truth=t, n=int(len(blk)),
-                            d_geo=d_geo, d_mean=d_mean, modal=int(counts.argmax()),
+                            d_geo=d["geo"], d_mean=d["mean"], modal=int(counts.argmax()),
                             share=float(counts.max() / len(blk)), entropy=entropy,
-                            persist=float((votes == d_geo).mean()),
-                            rank_geo=int((lp_geo > lp_geo[t]).sum()) + 1,
+                            persist=float((votes == d[rule]).mean()),
+                            rank=int((lp[rule] > lp[rule][t]).sum()) + 1,
                             veto=int((P[blk, t] <= 0).sum())))
     return out
 
@@ -166,7 +168,7 @@ def summarise(rows, key_decision):
                     entropy=float(np.mean([r["entropy"] for r in rs])),
                     persist=float(np.mean([r["persist"] for r in rs])),
                     veto_frames=float(np.mean([r["veto"] for r in rs])),
-                    runner_up_2_3=float(np.mean([2 <= r["rank_geo"] <= 3 for r in rs])))
+                    runner_up_2_3=float(np.mean([2 <= r["rank"] <= 3 for r in rs])))
     return dict(right=stats(right), wrong=stats(wrong))
 
 
@@ -185,6 +187,9 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--out", default=None)
     ap.add_argument("--out-name", default=None)
+    ap.add_argument("--agg", choices=("geo", "mean"), required=True,
+                    help="decision rule that defines right/wrong windows, persistence and rank: "
+                         "'geo' = product rule (mean log posterior), 'mean' = sum rule (mean posterior)")
     args = ap.parse_args()
     W = [int(x) for x in args.windows.split(",")]
 
@@ -202,7 +207,7 @@ def main():
     if not cells:
         raise SystemExit(f"no cells with posteriors for {args.policy} {args.modality} {args.arch} {args.condition}")
     print(f"=== {args.policy}  {args.modality}  {args.arch}  {args.condition}  "
-          f"{'gated' if args.full_body else 'ungated'}  {len(cells)} seeds ===")
+          f"{'gated' if args.full_body else 'ungated'}  {len(cells)} seeds  decision rule {args.agg} ===")
 
     rng = np.random.default_rng(args.seed)
     acc = {m: {rule: {str(w): [] for w in W} for rule in ("geo", "mean")} for m in ("cnn", "metric", "geo")}
@@ -245,13 +250,13 @@ def main():
 
         for m, P in (("cnn", p_cnn), ("metric", p_rf), ("geo", p_geo)):
             for w in W:
-                rows = window_rows(P, truth, rec, frame, w)
+                rows = window_rows(P, truth, rec, frame, w, args.agg)
                 acc[m]["geo"][str(w)].append(float(np.mean([r["d_geo"] == r["truth"] for r in rows])))
                 acc[m]["mean"][str(w)].append(float(np.mean([r["d_mean"] == r["truth"] for r in rows])))
                 if m == "cnn":
                     ndec[str(w)].append(len(rows))
                 if w == args.window:
-                    consistency[m].append(summarise(rows, "d_geo"))
+                    consistency[m].append(summarise(rows, "d_" + args.agg))
         for m, P in (("cnn", p_cnn), ("metric", p_rf)):
             pred = P.argmax(1)
             lags[m].append(lag_agreement(pred, truth, rec, frame, (1, 5, 10)))
@@ -286,8 +291,8 @@ def main():
               + "".join(f"{100 * np.mean(acc[m][r][str(w)]):>12.2f}%" for m in ("cnn", "metric", "geo") for r in ("geo", "mean")))
     print("  product rule (geo) vs arithmetic mean (mean), same decisions; a gap is the float16 veto")
 
-    print(f"\nvote consistency at W={args.window} (mean over seeds; share = modal vote fraction, "
-          f"entropy normalised, persist = frames voting the window's own decision):")
+    print(f"\nvote consistency at W={args.window} under the {args.agg} rule (mean over seeds; share = modal "
+          f"vote fraction, entropy normalised, persist = frames voting the window's own decision):")
     for m in ("cnn", "metric", "geo"):
         for side in ("right", "wrong"):
             parts = [c[side] for c in consistency[m] if c and c[side]]
@@ -302,7 +307,7 @@ def main():
         print(f"  {m:<7s}" + "  ".join(f"k={k}: {np.nanmean([l[k] for l in lags[m]]):.2f}" for k in ("1", "5", "10")))
     print("\ni.i.d. ceiling (plurality of W frames drawn independently from the frame-level confusion rows):")
     for m in ("cnn", "metric"):
-        print(f"  {m:<7s}" + "  ".join(f"W={w}: {100 * np.mean([c[str(w)] for c in ceiling[m]]):.1f}% (measured {100 * np.mean(acc[m]['geo'][str(w)]):.1f}%)"
+        print(f"  {m:<7s}" + "  ".join(f"W={w}: {100 * np.mean([c[str(w)] for c in ceiling[m]]):.1f}% (measured {100 * np.mean(acc[m][args.agg][str(w)]):.1f}%)"
                                         for w in W if w > 0))
     print("\nmodal confuser stable across >=80% of seeds:")
     for m in ("cnn", "metric"):
@@ -329,14 +334,14 @@ def main():
     if args.out:
         report = dict(_meta=dict(policy=args.policy, modality=args.modality, arch=args.arch,
                                  condition=args.condition, full_body=bool(args.full_body),
-                                 window=args.window, seeds=len(cells)),
+                                 window=args.window, seeds=len(cells), agg=args.agg),
                       acc={m: {r: {w: float(np.mean(v)) for w, v in d.items()} for r, d in dd.items()} for m, dd in acc.items()},
                       n_decisions={w: float(np.mean(v)) for w, v in ndec.items()},
                       consistency=consistency, lags=lags, ceiling=ceiling,
                       confuser_stability={m: confuser_stability(confusers[m]) for m in confusers},
                       both_wrong=both_wrong, stopping=stopping)
         name = args.out_name or (f"errors_{args.arch.replace('/', '-')}_{args.policy}_"
-                                 f"{'gated' if args.full_body else 'ungated'}.json")
+                                 f"{'gated' if args.full_body else 'ungated'}_{args.agg}.json")
         os.makedirs(args.out, exist_ok=True)
         with open(os.path.join(args.out, name), "w") as fh:
             json.dump(report, fh, indent=1)

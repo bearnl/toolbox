@@ -3330,3 +3330,99 @@ then V.C / VI / abstract / Table 2 numbers move to the sum rule with the product
 once as the check that found the veto. `tracklet_acc` in `results_*.json` already IS the sum
 rule, so Table D's multi-shot column needs no change.
 
+
+### 14.16 2026-09-13 — the sum rule applied: numbers verified, draft 4, two withdrawals
+
+**Inputs.** `sequence_alexnet-mean_*` and `sequence_cnxt-mean_*` (jobs 21847729 / 21847728,
+`_meta.agg = "mean"`), six policies × gates each, rsynced to `hiride2-results/`. Every number
+below was read from those JSONs by script, not from memory; the product-rule files
+(`sequence_cnxt_*`, `sequence_R4_standard_*`) stay on disk as the check.
+
+**R4 cross-session, gated, W=25 (103 decisions), whole recording (28):**
+| reader | W=1 | W=25 [95 % CI] | W=100 | whole | top-1/3/5 at W=25 |
+|---|---|---|---|---|---|
+| AlexNet best recipe | 21.6 | 27.6 [14.7, 42.0] | 32.9 | 31.4 | 27.6/55.1/66.4 |
+| 12 measurements | 28.9 | **48.2 [33.6, 61.9]** | 56.4 | 54.3 | 48.2/72.8/85.2 |
+| fusion (AlexNet) | 32.5 | 46.8 [32.2, 61.6] | 58.6 | 57.1 | 46.8/77.1/86.4 |
+| ConvNeXt best recipe | 29.5 | 47.8 [31.7, 63.7] | 55.7 | 55.0 | 47.8/73.0/82.5 |
+| fusion (ConvNeXt) | 39.3 | **61.4 [45.7, 76.2]** | 72.1 | 72.1 | 61.4/84.3/88.3 |
+Paired at W=25: AlexNet−metric −20.6 [−37.2, −3.8]; AlexNet fusion−metric −1.4 [−18.4, +15.3]
+(the from-scratch fusion adds nothing); ConvNeXt−metric −0.4 [−18.4, +17.4] (PARITY);
+ConvNeXt fusion−metric +13.2 [−3.6, +29.7]; fusion−ConvNeXt +13.6 [+5.8, +22.4].
+Ungated R4: metric 18.8 → 35.0 [23.4, 47.2] → 42.9 whole (gate worth +13 / +11 pp); AlexNet
+18.4 → 25.6 → 27.9; ConvNeXt 25.9 → 41.4 → 49.3; ConvNeXt fusion 30.8 → 48.2 → 58.6,
+fusion−metric +13.2 [+1.2, +25.1] RESOLVABLE. Answer-when-sure (metric, gated): vote
+fraction > 0.2 keeps 50 % of decisions at 71.2 %; > 0.3 keeps 21 % at 77.3 %.
+Per-subject at W=25 gated: measurements 8 never / 7 always, median 48 %; AlexNet fusion
+3/3, median 42 % (moves six of the eight off zero, drops subject 006 from 60 % to 0);
+ConvNeXt fusion 3 never / 4 always, median 80 %.
+
+**Field's protocol (train all 50, 50-way), sum rule — Table 2 of the manuscript:**
+| probe | reader | W=1 | whole |
+|---|---|---|---|
+| Walking gated | AlexNet averaged | 16.9 | 25.7 |
+| Walking gated | 12 measurements | 22.3 | 46.4 |
+| Walking gated | fusion AlexNet | 26.9 | 47.9 |
+| Walking ungated | AlexNet | 14.3 | 27.1 |
+| Walking ungated | 12 measurements | 14.6 | 40.7 |
+| Walking ungated | ConvNeXt | 20.6 | 44.3 |
+| Walking gated | ConvNeXt | 22.5 | 44.3 |
+| Walking gated | fusion ConvNeXt | 32.4 | **62.1** (W=25 49.1 [33.5, 65.8]) |
+| Still gated | 12 measurements | 36.8 | 46.4 (W=25 43.4) |
+| Still gated | AlexNet | 23.9 | 27.9 |
+| Still gated | ConvNeXt | 27.8 | 37.9 (W=25 30.5) |
+| Still gated | fusion ConvNeXt | 40.6 | 48.6 |
+Distractor cost for the gated measurements at W=25: 48.2 (K=28) → 35.1 (K=50). Walking
+ungated W=25: ConvNeXt 32.2 vs metric 26.7 (network the more robust reader of clipped
+frames); Still gated W=25: metric 43.4 vs ConvNeXt 30.5 (measurements lead on whole bodies).
+
+**Two withdrawals forced by the sum rule (both were the veto):**
+1. §14.11's "ungated, CNN = metric at every window (23.6/23.6)". Under the sum rule the
+   ungated whole-walk numbers are 27.1 (AlexNet) vs 40.7 (measurements). Introduction
+   finding 1 no longer says "tie at every observation window".
+2. §14.15's "the measurements' errors ARE within-window correlated (8 pp below their i.i.d.
+   ceiling)". `iid_ceiling` is a plurality over independent draws (rule-free); the "measured"
+   it was compared with was the product rule. Under the sum rule the measurements sit 3.3 pp
+   below their ceiling (51.5 → 48.2), the AlexNet 3.3 below its own (30.9 → 27.6), ConvNeXt
+   1.6 (49.4 → 47.8); lag-k agreement of WRONG frames is similar for both readers (AlexNet
+   0.48/0.21/0.20 vs metric 0.45/0.15/0.13 at k = 1/5/10). Wording ceiling: "what limits a
+   reader after 2.5 s is its frame-level confusion matrix, not a stronger correlation of its
+   errors along the walk". Manuscript VI.D says this now.
+   Still valid and rule-independent: veto counts (2.2 / 5.9 frames per wrong metric window),
+   confuser stability across seeds (AlexNet 29–36 %, ConvNeXt 57–61 %, measurements 86–89 %),
+   both-wrong enrichment (54 % clipped vs 32 %; 56 % out-of-band vs 40 %), stopping cost 1.7 pp.
+   Rule-DEPENDENT and not yet re-run: vote consistency (modal share 0.41 vs 0.36, persistence
+   0.38 vs 0.26) — computed with `summarise(rows, "d_geo")`; see the code change below.
+
+**Code (this session):**
+- `hiride_errors.py`: `--agg {geo,mean}` is now REQUIRED; it decides which rule defines
+  right/wrong windows, which decision `persist` is measured against, which score ranks the
+  true class (`rank`, formerly `rank_geo`), and the "measured" column beside the i.i.d.
+  ceiling; `_meta.agg` recorded; output name `errors_<arch>_<policy>_<gate>_<agg>.json` so the
+  09-13 product-rule files are not overwritten. `submit_errors.sh [geo|mean]` (default mean).
+- `hiride_figures.py`: Fig 7 legend labels `network / measurements / fusion` (were the JSON
+  keys `cnn / metric / geo`; "geo" now means the product rule elsewhere and would mislead).
+- Fig 7 was re-rendered LOCALLY (scratch venv with numpy 2.5 + matplotlib 3.11; the script
+  only reads JSONs) from `sequence_cnxt-mean_R4_cross_session_{gated,ungated}.json` →
+  `hiride2-results/figs_local_sumrule/fig7_operating_point.pdf`, copied into
+  `submissions-TBIOM-2026/figs/`. It shows the PRETRAINED encoder under the sum rule; the
+  product-rule/from-scratch render is preserved only in the session scratchpad.
+- Fig 8 / cohort curve: STILL product rule (`cohort.json` of 09-06). Needs the `hiride-sumrule`
+  job (`hiride_cohort.py --agg mean --out $R/sumrule` + `hiride_figures.py --cohort
+  $R/sumrule/cohort.json --out $R/figs_sumrule`); the manuscript carries a red todo in V.D.
+
+**Manuscript — draft 4 (`submissions-TBIOM-2026/main.tex`):** abstract, introduction findings
+1–3, III.E (sum rule primary), V.C, V.D, V.E + Table 2, VI.A, VI.D, VII moved to the sum rule
+with the product rule reported once (VI.D) as the check that found the veto; Discussion,
+Conclusion and Reproducibility written; abstract trimmed to ~290 words. Red todos left:
+authors/affiliations (the T-Privacy submission listed Zizui Chen and Stephen Czarnuch,
+MUN — author to confirm), in-house corpus release policy, archive DOI, cohort/Fig 8 (job
+above), vote-consistency numbers (re-run above). T-BIOM regular papers: ≤ 10 pages, MOPC
+beyond (venue_fit_audit.md); draft 4 compiles to 11 pages.
+
+**Next commands for the author (Nibi):** `git pull` in toolbox; `bash submit_errors.sh`
+(1 CPU job, 8 cores, ≤ 2 h wall, 0 GPU-hours; writes four `errors_*_mean.json`); the
+`hiride-sumrule` cohort+figures job if not yet run (1 CPU job, 12 cohort draws × forest
+fits, ≤ 2 h; 0 GPU-hours); rsync `results/errors_*_mean.json results/sumrule/
+results/figs_sumrule/`. Then: Fig 8 swap, cohort numbers in V.D, consistency numbers in
+VI.D, authors → draft 5.

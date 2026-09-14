@@ -96,3 +96,28 @@ every unidentified person assignable a cause in millimetres. What carries identi
 depth video is body geometry seen as an outline; the depth values add a little to a pretrained
 network and everything to a tape measure.
 
+
+## Rev 5 — 2026-09-13, the sum rule adopted; draft 4 written
+
+Author decision: every aggregated number is the sum rule (arithmetic mean of posteriors,
+Kittler et al. 1998); the product rule appears once, as the check that found the float16
+veto. Numbers that move (R4, gated, 2.5 s = 103 decisions): measurements **48.2 % [33.6, 61.9]**,
+ConvNeXt 47.8 % [31.7, 63.7] — parity, −0.4 pp [−18.4, +17.4] — fusion **61.4 % [45.7, 76.2]**,
+top-3 84 %, top-5 88 %; whole recording 54.3 / 55.0 / 72.1. Field's protocol, gated whole walk:
+measurements 46.4, ConvNeXt 44.3, fusion **62.1** against the published 43–50; Still probe
+whole 46.4 for the measurements. Ungated R4 measurements 35.0 → 42.9, so the gate is worth
++13 / +11 pp and the Rev-3 "tie at every ungated window" was the veto. Per-subject at 2.5 s:
+measurements 8 never / 7 always (median 48 %); ConvNeXt fusion 3 never / 4 always (median 80 %).
+
+Withdrawn from Rev 4: "the measurements' errors are within-walk correlated (8 pp below their
+i.i.d. ceiling)". Under the sum rule both readers sit ~3 pp below their plurality ceilings
+(network 30.9 → 27.6, measurements 51.5 → 48.2, ConvNeXt 49.4 → 47.8) and their wrong frames
+agree with their neighbours at similar rates (lag-1 0.48 vs 0.45). What limits a reader after
+2.5 s is its frame-level confusion matrix; what distinguishes the readers is whose confusions
+those are — stable nearest neighbours in millimetres (86–89 % of recordings keep their
+confuser across seeds) against confusions of the fit (29–36 % AlexNet, 57–61 % ConvNeXt).
+
+Closing sentence of the paper, as drafted: 48 % from twelve lengths, 48 % from the pretrained
+network, 61 % together from 2.5 s of gated depth on 28 people, 62 % over a whole walk under the
+field's protocol. Explainable is the measurements' property alone; what carries identity in
+consumer depth video is body geometry seen as an outline.
