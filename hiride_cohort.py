@@ -56,6 +56,8 @@ def main():
                          "hiride_errors.py found suppressing the metric model (HIRIDE_HANDOFF 14.15).")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
+    if args.out:
+        os.makedirs(args.out, exist_ok=True)
     Ks = [int(x) for x in args.cohorts.split(",")]
 
     man = load_manifest(os.path.join(args.prep, "manifest.npz"))
