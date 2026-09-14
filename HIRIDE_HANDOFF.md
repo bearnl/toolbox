@@ -3475,3 +3475,9 @@ frame by the mass the two models agree on, which is a different rule. Fixed (bot
 measurements' curve and the network's are unaffected. Re-run to align the fusion point with
 V.C: 1 CPU job, ~10 min, 0 GPU-hours (same `hiride-sumrule` command; re-render locally after
 rsync of `results/sumrule/cohort.json`).
+
+**Corrected cohort run (normalised fusion, 2026-09-14, rsynced `sumrule/cohort.json`):**
+measurements and network unchanged; fusion @W now 77.6 / 71.9 / 71.7 / 58.8 / 52.5 / **46.8** for
+K = 4 / 7 / 10 / 14 / 21 / 28 (spread 56.4 at K=4), retrained fusion 55.0 / 59.7 / 48.3 at
+K = 7 / 14 / 21. K=28 fusion now equals the sequence file (46.8). Fig 8 re-rendered locally and
+placed in the submission; V.D quotes the corrected retrained numbers. The open check is closed.
