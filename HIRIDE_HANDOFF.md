@@ -3481,3 +3481,9 @@ measurements and network unchanged; fusion @W now 77.6 / 71.9 / 71.7 / 58.8 / 52
 K = 4 / 7 / 10 / 14 / 21 / 28 (spread 56.4 at K=4), retrained fusion 55.0 / 59.7 / 48.3 at
 K = 7 / 14 / 21. K=28 fusion now equals the sequence file (46.8). Fig 8 re-rendered locally and
 placed in the submission; V.D quotes the corrected retrained numbers. The open check is closed.
+
+**Author decisions 2026-09-14:** author block duplicated from the T-Privacy submission (Zizui
+Chen and Stephen Czarnuch, Memorial University of Newfoundland; corresponding author Czarnuch;
+no funding note existed there, none added). The in-house Azure Kinect corpus CANNOT be released
+— Reproducibility says so; do not propose derived releases. One red todo left in the
+manuscript: the archive DOI.
