@@ -52,8 +52,11 @@ def main():
     ap.add_argument("--full-body", action="store_true")
     ap.add_argument("--agg", choices=("geo", "mean"), default="geo",
                     help="window decision rule: product rule (geo, the historical default) or the "
-                         "arithmetic mean of posteriors, which is immune to the float16 veto that "
-                         "hiride_errors.py found suppressing the metric model (HIRIDE_HANDOFF 14.15).")
+                         "arithmetic mean of per-frame posteriors, which is immune to the float16 veto "
+                         "that hiride_errors.py found suppressing the metric model (HIRIDE_HANDOFF 14.15). "
+                         "The fused posterior is normalised per frame, as in hiride_sequence.py: under geo "
+                         "that changes nothing, under mean an unnormalised product would weight frames by "
+                         "their agreement mass.")
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
     if args.out:
@@ -165,6 +168,7 @@ def main():
                     "cnn columns must follow sorted(pick) -- see the geo bug"
                 sn = sub / np.clip(sub.sum(1, keepdims=True), 1e-12, None)
                 pg = np.exp(np.log(sn + 1e-12) + np.log(pm + 1e-12))
+                pg /= np.clip(pg.sum(1, keepdims=True), 1e-12, None)
                 rec = np.array([f"{a}|{b}" for a, b in
                                 zip(np.asarray(man["seq"], str)[rs], subj_all[rs])])
                 frame = np.asarray(man["frame"])[rs].astype(np.int64)
@@ -206,6 +210,7 @@ def main():
                     rp = rz["prob"].astype(np.float64)[rsel][idx[okr]]
                     rp /= np.clip(rp.sum(1, keepdims=True), 1e-12, None)
                     pg_rt = np.exp(np.log(rp + 1e-12) + np.log(pm[okr] + 1e-12))
+                    pg_rt /= np.clip(pg_rt.sum(1, keepdims=True), 1e-12, None)
                     accs["geo_rt_w"].append(
                         win_acc(pg_rt, goldK[okr], rec[okr], frame[okr]))
             for k in per:

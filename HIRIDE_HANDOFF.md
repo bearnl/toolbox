@@ -3465,3 +3465,13 @@ affiliations / funding, the in-house corpus release policy, the archive DOI. The
 target (T-BIOM regular, MOPC beyond) needs content cuts the author must choose; candidates:
 Fig 2 and Fig 4 (their numbers are in Tables 1 and 4), the conditions panel Fig 6, Related
 Work and Discussion trims.
+
+**Cause of the 47.8 vs 46.8 discrepancy (found 2026-09-14):** `hiride_cohort.py` fused the two
+posteriors as an UNNORMALISED product (`exp(log sn + log pm)`), `hiride_sequence.py` and
+`hiride_errors.py` normalise the product per frame. Under the product rule the argmax is
+unchanged, so the two scripts agreed; under the sum rule the unnormalised product weights each
+frame by the mass the two models agree on, which is a different rule. Fixed (both `pg` and
+`pg_rt` now normalised). Fig 8's fusion curve in draft 5 is from the unnormalised run; the
+measurements' curve and the network's are unaffected. Re-run to align the fusion point with
+V.C: 1 CPU job, ~10 min, 0 GPU-hours (same `hiride-sumrule` command; re-render locally after
+rsync of `results/sumrule/cohort.json`).
