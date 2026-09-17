@@ -3633,3 +3633,10 @@ four corrections (papers commit after f1ec7b8).
    sequences; Delécluse's table quoted the Still values, and the walking bound stands.
 Abstract now 246 words. Rule for later edits: quote a published number only after reading it in
 the source table, with its dataset, modality, protocol and decision unit.
+Follow-up the same day. The author searched the PDF for "100%" and found it only in the abstract.
+The `\,\%` thin space reads as a space in body-text size in PDF viewers, so all 242 percentages
+are now `\%` (paper 1 style). The abstract's claim was also not restated in the body; the third
+paragraph of the Introduction now opens with it ("close to 100% ... but much lower when they come
+from different sessions") before the cited evidence, and the upper bound (30%, 50%) is attributed
+to BIWI RGBD-ID in the abstract, cover letter and Discussion, because MultiGait's cross-session
+65–77% exceeds it. Abstract 245 words.
