@@ -3487,3 +3487,51 @@ Chen and Stephen Czarnuch, Memorial University of Newfoundland; corresponding au
 no funding note existed there, none added). The in-house Azure Kinect corpus CANNOT be released
 — Reproducibility says so; do not propose derived releases. One red todo left in the
 manuscript: the archive DOI.
+
+### 14.18 2026-09-16, submission preparation for T-BIOM
+
+**Where the manuscript lives now.** The T-BIOM draft replaced the 2023 draft in place, as
+`papers/paper-depth/{main.tex, refs.bib, figs/, cover_letter.tex, SUBMISSION_CHECKLIST.md}`
+(papers commit 88d4063; the old draft, `data/`, `images/`, `ieeetj.cls` and `notes` are
+removed from HEAD and remain in history). There is no `submissions-TBIOM-2026/` any more, so
+every path above that names it is historical. Generated files (manuscript, cover letter PDF,
+source zip) are in `paper-depth/build/`, which is gitignored. CI compiles `*/main.tex` on
+master only. Author rule 2026-09-16: never create branches, commit and push on master.
+
+**Venue requirements checked at source.** Regular papers up to 10 pages, with Mandatory
+Overlength Page Charges beyond after final layout (the draft is 14 pages). Abstract one
+paragraph up to 250 words with no abbreviations, references or equations (now 235 words), 3
+to 5 keywords (now 5). An IRB statement naming the official committee, with consent to take
+part and to publication, is required in the manuscript and in the portal box. Double-anonymous
+review is optional. Portal https://ieee.atyponrex.com/journal/tbiom, Editor-in-Chief Mark Nixon.
+
+**Figures (`hiride_figures.py`).** Drawn at the printed width (COL_W 3.5 in, PAGE_W 7.16 in)
+with constrained layout and 8 to 9 pt Arial, fonts embedded as TrueType (`pdf.fonttype 42`),
+since the previous Type 3 fonts fail IEEE PDF eXpress and the previous text printed at 3 to
+5 pt. Condition, probe and network names come from `COND_LABEL`, `PROBE_LABEL` and
+`network_label(meta)`; in-figure titles and footnotes moved into the LaTeX captions; Fig 8
+shows the fusion margin on a top axis. Regenerate with
+`--stats stats_final.json --range range_profile.json --cohort sumrule/cohort.json
+--sequence sequence_cnxt-mean_R4_cross_session_gated.json --sequence
+sequence_cnxt-mean_R4_cross_session_ungated.json`. **`hiride2-results/cohort.json` is the stale
+product-rule file** (measurements 43.3 % at K=28); the paper uses `sumrule/cohort.json`
+(48.2 %). Every drawn number was diffed against the previous renders and is identical. The
+conditions panel needs `--prep`, so the submitted Fig 5 was re-laid out locally from the
+lossless panels in the cluster render (extracted with `pdfimages`); `fig_conditions` now
+produces the same design on the cluster.
+
+**Manuscript changes.** UK English read sentence by sentence (learnt, no em-dashes or prose
+colons); Section III presents the approach and Section IV the data and protocol; abbreviations
+defined at first use; the archive-DOI todo replaced by a deposit-on-acceptance statement
+scoped to the two public corpora. References audited against Crossref, arXiv, PMLR and ACM
+records: `friedman2022` had the wrong title and author list (it is "Biometric Performance as
+a Function of Gallery Size", six authors), MultiGait's third author is Philip Dissert, Xiao et
+al. is ICLR 2021, arXiv identifiers now print, and six entries gained pages or issue numbers.
+
+**Open.** (1) The IRB statement in Section IV-A is red: consent is recorded here (2026-09-09),
+but no committee name or approval is recorded anywhere. (2) HI-RIDE naming: the title "... of
+Person Identification with HI-RIDE" makes HI-RIDE read as a model, while paper 3 cites HI-RIDE
+as this paper (`chen2025hiride`, "Human Identification and Recognition in Depth Imaging
+Environments"); the author is deciding how the name is used. (3) `paper3/main.bib` still gives
+`chen2025hiride` as "Under review, IEEE Transactions on Privacy", which rejected it on
+2026-09-09.
