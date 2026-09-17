@@ -40,10 +40,13 @@ plt.rcParams.update({"font.family": "sans-serif",
 
 # The ladder, in the order the argument is made. R2 was never run.
 RUNGS = ["R0_frame_random", "R1_block", "R3_cross_recording", "R4_cross_session"]
-RUNG_LABEL = {"R0_frame_random": "R0\nframe-\nrandom",
-              "R1_block": "R1\nblock\nhold-out",
-              "R3_cross_recording": "R3\ncross-\nrecording",
-              "R4_cross_session": "R4\ncross-\nsession"}
+RUNG_LABEL = {"R0_frame_random": "Frame-\nrandom",
+              "R1_block": "Block\nhold-out",
+              "R3_cross_recording": "Cross-\nrecording",
+              "R4_cross_session": "Cross-\nsession"}
+# one-line protocol names, for legends
+RUNG_NAME = {"R0_frame_random": "Frame-random", "R1_block": "Block hold-out",
+             "R3_cross_recording": "Cross-recording", "R4_cross_session": "Cross-session"}
 DEPTH_C, RGB_C = "#1f77b4", "#d62728"
 # hiride_train.py calls apply_mask_condition(img, m, condition, 0.0, ...)
 TRAINER_FILL = 0.0
@@ -51,22 +54,22 @@ TRAINER_FILL = 0.0
 # The paper's names for conditions and linear-probe arms, so that no code
 # identifier reaches a published figure.
 COND_LABEL = {"full": "Full frame", "person": "Person only",
-              "bg_hole": "Person removed (hole kept)", "bg_plate": "Person removed (plate)",
-              "silhouette": "Silhouette", "person_centred": "Person, re-centred",
-              "scale_removed": "Person, size and position removed",
-              "sil_scaled": "Silhouette, size and position removed",
-              "interior_only": "Interior only (rim eroded)"}
-PROBE_LABEL = {"depth scale_rm @6000": "Depth, size and position removed",
-               "depth sil_scaled": "Depth silhouette, size and position removed",
-               "depth interior_only": "Depth interior only, 0–6 m range",
-               "depth interior @600": "Depth interior only, 600 mm window",
-               "rgb scale_rm": "RGB, size and position removed"}
+              "bg_hole": "Person removed (hole)", "bg_plate": "Person removed (background plate)",
+              "silhouette": "Silhouette", "person_centred": "Person re-centred",
+              "scale_removed": "Normalised person",
+              "sil_scaled": "Normalised silhouette",
+              "interior_only": "Interior only"}
+PROBE_LABEL = {"depth scale_rm @6000": "Normalised person, depth",
+               "depth sil_scaled": "Normalised silhouette",
+               "depth interior_only": "Interior only, 0–6 m range",
+               "depth interior @600": "Interior only, 600 mm window",
+               "rgb scale_rm": "Normalised person, colour"}
 
 
 def network_label(meta):
     """Name the CNN arm by what it is; sequence and cohort runs use either encoder."""
-    return ("Pretrained network" if "convnext" in meta.get("arch", "")
-            else "Network trained from scratch")
+    return ("Pretrained CNN" if "convnext" in meta.get("arch", "")
+            else "CNN trained from scratch")
 
 
 def save(fig, out, name):
@@ -136,7 +139,7 @@ def fig_collapse(stats, out, ceiling=95.0):
     ax.axhline(0, color="#888888", lw=0.8, ls="--", zorder=1)
     ax.set_xticks(range(len(have)))
     ax.set_xticklabels([RUNG_LABEL[p] for p in have])
-    ax.set_ylabel("RGB minus depth accuracy (pp)")
+    ax.set_ylabel("Colour minus depth accuracy (pp)")
     # No in-figure title or key text; the caption carries both, including the
     # count of saturated cells drawn as open circles.
     print(f"    fig1: {n_sat} saturated cells (both modalities >= {ceiling:.0f} %) drawn "
@@ -162,8 +165,8 @@ def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
     is not an identification result whatever its mean says.
     """
     fig, ax = plt.subplots(figsize=(COL_W, 2.6))
-    # "best recipe" is defined in the caption; the full name overran the panel
-    recipe = {arch: "pooling head", overlay_arch: "best recipe"}
+    # the two configurations are defined in the caption and in Section III
+    recipe = {arch: "baseline", overlay_arch: "improved"}
     drawn, handles = False, []
     for use_arch, style, alpha, tag in ((arch, "o-", 0.16, arch),
                                         (overlay_arch, "s--", 0.0, overlay_arch)):
@@ -202,7 +205,7 @@ def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
             # proxy handle, so the legend shows solid against dashed as well
             handles.append((use_arch == overlay_arch, Line2D(
                 [], [], color=colour, marker=marker, ms=4, markerfacecolor=filled, ls=dash,
-                lw=1.4, label=f"{'Depth' if mod == 'depth' else 'RGB'}, {recipe[tag]}")))
+                lw=1.4, label=f"{'Depth' if mod == 'depth' else 'Colour'}, {recipe[tag]}")))
             for run in runs:
                 if len(run) > 1:
                     ax.plot([xs[k] for k in run], [ys[k] for k in run], ls=dash,
@@ -254,10 +257,10 @@ def fig_mechanism(stats, out, arch="alexnet"):
             any_drawn = True
         im = ax.imshow(M, aspect="auto", cmap="viridis", vmin=0, vmax=100)
         ax.set_xticks(range(len(RUNGS)))
-        ax.set_xticklabels([p.split("_")[0] for p in RUNGS])
+        ax.set_xticklabels([RUNG_LABEL[p] for p in RUNGS])
         ax.set_yticks(range(len(conds)))
         ax.set_yticklabels([COND_LABEL[c] for c in conds])
-        ax.set_title("Depth" if mod == "depth" else "RGB")
+        ax.set_title("Depth" if mod == "depth" else "Colour")
         for i in range(len(conds)):
             for j in range(len(RUNGS)):
                 if np.isfinite(M[i, j]):
@@ -318,7 +321,7 @@ def fig_bits(stats, out):
         pts = [max(rows, key=lambda r: r[4]) for _, rows in sorted(by_bits.items())]
         drawn = True
         b, y, lo, hi, _ = map(np.array, zip(*pts))
-        ax.plot(b, y, marker + "-", color=colour, label=policy.split("_")[0], lw=1.4, ms=4)
+        ax.plot(b, y, marker + "-", color=colour, label=RUNG_NAME[policy], lw=1.4, ms=4)
         ax.fill_between(b, lo, hi, color=colour, alpha=0.15)
     if not drawn:
         print("  (fig4 skipped: no bit-depth cells)")
@@ -367,8 +370,8 @@ def fig_range(rp, out):
         yy = [y for y in ys if y is not None]
         ax.plot(xs, yy, marker=marker, ls=dash, color=colour, alpha=0.9, lw=1.3,
                 ms=4, label=PROBE_LABEL.get(label, label))
-    ax.set_xlabel("Person median depth (mm)")
-    ax.set_ylabel("Linear-probe accuracy (%)")
+    ax.set_xlabel("Median distance of the person (mm)")
+    ax.set_ylabel("Frame accuracy (%)")
     ax.set_xticks(centres)
     ax.set_xticklabels(labels)
     ax2 = ax.twinx()
@@ -465,7 +468,7 @@ def fig_operating_point(paths, out):
     """
     import json as _json
     fig, ax = plt.subplots(figsize=(COL_W, 2.9))
-    ARMS = (("cnn", None, "#7f7f7f"), ("metric", "Measurements", DEPTH_C), ("geo", "Fusion", "#9467bd"))
+    ARMS = (("cnn", None, "#7f7f7f"), ("metric", "Anthropometric", DEPTH_C), ("geo", "Combination", "#9467bd"))
     drawn, ticks, labels = False, [], []
     for pi, path in enumerate(paths):
         try:
@@ -516,7 +519,7 @@ def fig_operating_point(paths, out):
     ax.set_xlabel("Frames per decision (number of decisions)", labelpad=2)
     ax.set_ylabel("Decision accuracy (%)")
     ax.axhline(6.34, color="#cc3311", lw=0.9, ls=":",
-               label="Majority-class rate (gated)")
+               label="Majority-class rate")
     ax.legend(frameon=False, ncol=2, loc="upper center", bbox_to_anchor=(0.5, -0.30),
               columnspacing=1.2, handlelength=1.8)
     ax.spines[["top", "right"]].set_visible(False)
@@ -554,8 +557,8 @@ def fig_cohort(path, out):
     # very lines they qualify. Whiskers carry the same min-max and stay legible;
     # a small multiplicative x-offset separates the arms on a log axis.
     for i, (arm, colour, lab) in enumerate((("cnn_w", "#7f7f7f", network_label(meta)),
-                                            ("met_w", DEPTH_C, "Measurements"),
-                                            ("geo_w", "#9467bd", "Fusion"))):
+                                            ("met_w", DEPTH_C, "Anthropometric"),
+                                            ("geo_w", "#9467bd", "Combination"))):
         ys = np.array([blob[str(k)]["mean"].get(arm, float("nan")) for k in Ks])
         lo = np.array([100 * min(blob[str(k)]["draws"].get(arm, [float("nan")]))
                        for k in Ks])
@@ -580,11 +583,11 @@ def fig_cohort(path, out):
     top.set_xticks(Ks)
     top.set_xticklabels(margin, color="#9467bd")
     top.minorticks_off()
-    top.set_xlabel("Fusion margin over chance", color="#9467bd")
-    ax.set_xlabel("Enrolled cohort size (subjects)")
+    top.set_xlabel("Combination accuracy relative to chance", color="#9467bd")
+    ax.set_xlabel("Number of enrolled people")
     ax.set_ylabel(f"Accuracy at {meta.get('window', 25)} frames per decision (%)")
     h, l = ax.get_legend_handles_labels()
-    want = [network_label(meta), "Measurements", "Fusion", "Chance (1/K)"]
+    want = [network_label(meta), "Anthropometric", "Combination", "Chance (1/K)"]
     ax.legend([h[l.index(w)] for w in want], want, frameon=False, ncol=2,
               loc="upper center", bbox_to_anchor=(0.5, -0.24), columnspacing=1.2,
               handlelength=1.8)

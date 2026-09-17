@@ -3542,3 +3542,67 @@ title in `paper2_lit_audit/ESSENCE.md` rev 3 is superseded. Papers commit 4459fc
 but no committee name, approval or consent to publication is recorded anywhere. (2)
 `paper3/main.bib` still gives `chen2025hiride` as "Under review, IEEE Transactions on Privacy",
 which rejected it on 2026-09-09.
+
+### 14.19 2026-09-16, the manuscript rewritten from scratch
+
+**Why.** Author instruction 2026-09-16: the paper is new, no HI-RIDE paper was ever published,
+and the only prior work of the authors is the skeleton paper (Chen et al. 2023, MLWA). The
+§14.18 text assumed the reader already knew the study ("reported only at two extremes", "the
+ladder", "readers") and patching it was ruled out, so `paper-depth/main.tex` was rewritten in
+full in plain academic English that defines every term where it is first used. Papers commit
+f1ec7b8 (local on master; the push failed at the 1Password SSH agent and must be run by hand).
+
+**Structure and names, including figure labels.** Introduction, Related Work, Datasets,
+Identification Methods, Experimental Setup, Results (A protocol, B information used by the CNN,
+C body measurements, D pretrained CNN, E comparison and combination, F published results,
+G individuals and cohort size, H hypotheses not supported), Discussion (published accuracies,
+privacy, interpretability, limitations), Conclusion, Data and Code Availability. Protocols are
+frame-random, block hold-out (g = 150), cross-recording, cross-session and the standard
+protocol, never R0 to R4. The networks are the CNN trained from scratch in the baseline
+configuration (global average pooling) or the improved configuration (row-wise pooling, ±8 px
+shifts) and the pretrained CNN (ConvNeXt-Tiny). The random forest on the twelve measurements is
+the anthropometric classifier. Say full-body frames (not gate), combination (not fusion),
+colour (not RGB), and normalised person, normalised silhouette, person re-centred, person
+removed (hole or background plate), interior only. The §14.18 component names (learnt reader,
+measured reader, full-body gate, observation budget) are superseded. HI-RIDE appears twice, as
+the name of the paper in the Introduction and in "In HI-RIDE, we examined" in the Conclusion.
+
+**Corrections made while rewriting, each read from the result JSONs.**
+1. Pretrained CNN, single full-body frames, cross-session: 29.5 % (gated W=1 = 29.55), not 29.6.
+2. "32.2 against 26.7 % at 2.5 s ungated" is the STANDARD protocol
+   (`sequence_cnxt-mean_R4_standard_walking_ungated.json`). Cross-session ungated W=25 is
+   ConvNeXt 41.4 against measurements 35.0, and the paper now quotes those.
+3. Surface normals (wave 9, gap head) fell from 13.7 to 6.4 % across sessions (§12.2), not 6.7.
+4. The head-anchored shape block's loss after aggregation (43.30 to 42.33 at W=25, 50.71 to
+   48.57 whole) is a product-rule result, and Table VII says so.
+5. Published BIWI numbers. Munaro's 42.9 % is PCM+Skeleton, marked RGB-D in Haque 2016 Table 3
+   and cited there to the ICRA 2014 paper, now `munaro2014icra` (DOI 10.1109/ICRA.2014.6907518,
+   Crossref-verified). Skeleton NN is 21.1 single (Haque [52], ICRA) and 39.3 multi-shot
+   (Haque [53], the chapter). Depth-only sequence results on Walking run from 27.8 to 50.0, with
+   45.3 to 50.0 for sequence models, so "43–50 %" became "a previous best of 50 %". Wu et al.
+   2017 Table IV used 22 training people, a 28-way gallery and probe split and frames selected
+   by face detection, and its "multi-shot" means five gallery images; the paper now says so.
+   Munaro's Still 32.5 % could not be verified at source and is no longer quoted. Karianakis
+   removed frames "heavily occluded from the image boundaries or too far from the sensor",
+   cited to show that frame selection is standard practice.
+6. Near-duplication hypothesis: the prediction was a NEGATIVE correlation between the
+   adjacent/random |Δdepth| ratio and the R0→R1 drop. The measured +0.64 and +0.78 mean that
+   people whose consecutive frames were less similar lost more, because the room drives both.
+7. Label-free drift selection: 0.02 and 1.87 are drift/sig (|slope| x 2.2 m / between-subject SD).
+8. The i.i.d. ceiling is a plurality vote over independent draws from each class's confusion
+   row. The both-wrong enrichment (54 against 32 %, 56 against 40 %) comes from the UNGATED
+   AlexNet x RF file; clipped means bottom touch, and out of band means outside the p5–p95 of
+   training median depth.
+
+**Tables and figures.** Table VI (standard protocol) has blocks for this study on full-body
+frames, this study on all frames and published results, each with single-frame and
+whole-recording columns, and published values are no longer attached to our rows.
+`hiride_figures.py` uses the names above (`RUNG_LABEL`, new `RUNG_NAME`, `COND_LABEL`,
+`PROBE_LABEL`, `network_label`, legends, Fig 8 axes). Figures 1 to 5, 7 and 8 were regenerated
+locally, and every drawn number was diffed against the previous renders and is identical. The
+conditions figure is unchanged.
+
+**State.** 16 pages (previously 14), abstract 245 words, seven `table*`, no undefined
+references, no overfull boxes, no Type 3 fonts, and a clean build from `latex_source.zip`.
+Cover letter (one page) and `SUBMISSION_CHECKLIST.md` rewritten. The open items of §14.18 are
+unchanged, the IRB statement in Section III-C is still red.
