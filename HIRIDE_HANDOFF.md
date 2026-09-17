@@ -3528,10 +3528,17 @@ records: `friedman2022` had the wrong title and author list (it is "Biometric Pe
 a Function of Gallery Size", six authors), MultiGait's third author is Philip Dissert, Xiao et
 al. is ICLR 2021, arXiv identifiers now print, and six entries gained pages or issue numbers.
 
-**Open.** (1) The IRB statement in Section IV-A is red: consent is recorded here (2026-09-09),
-but no committee name or approval is recorded anywhere. (2) HI-RIDE naming: the title "... of
-Person Identification with HI-RIDE" makes HI-RIDE read as a model, while paper 3 cites HI-RIDE
-as this paper (`chen2025hiride`, "Human Identification and Recognition in Depth Imaging
-Environments"); the author is deciding how the name is used. (3) `paper3/main.bib` still gives
-`chen2025hiride` as "Under review, IEEE Transactions on Privacy", which rejected it on
-2026-09-09.
+**Author decision 2026-09-16, the name.** HI-RIDE is this paper as a whole, its methodology,
+results and conclusions. There is no model called HI-RIDE and there will not be one. The title
+is therefore the name it abbreviates, "Human Identification and Recognition in Depth Imaging
+Environments" (the title paper 3 cites as `chen2025hiride`). The manuscript defines the name
+once ("We call this work HI-RIDE") and uses it only for the work (the conclusion opens "In
+HI-RIDE we have asked"); Section III is "Method", and components are named by function
+(learnt reader, measured reader, full-body gate, observation budget, fusion). Never write "with
+HI-RIDE", "the HI-RIDE approach", "HI-RIDE uses" or "the learnt reader of HI-RIDE". The working
+title in `paper2_lit_audit/ESSENCE.md` rev 3 is superseded. Papers commit 4459fc6.
+
+**Open.** (1) The IRB statement in Section IV-A is red. Consent is recorded here (2026-09-09),
+but no committee name, approval or consent to publication is recorded anywhere. (2)
+`paper3/main.bib` still gives `chen2025hiride` as "Under review, IEEE Transactions on Privacy",
+which rejected it on 2026-09-09.

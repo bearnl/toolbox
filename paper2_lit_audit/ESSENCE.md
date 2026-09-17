@@ -4,7 +4,9 @@ Approved direction (author, 2026-09-10/11): not "depth is not private" but **wha
 
 ## Working title
 
-**What Carries Identity in Consumer Depth Video? A Two-Sided Evaluation of Person Identification with HI-RIDE**
+~~What Carries Identity in Consumer Depth Video? A Two-Sided Evaluation of Person Identification with HI-RIDE~~
+
+**Human Identification and Recognition in Depth Imaging Environments** (author, 2026-09-16). HI-RIDE names the paper as a whole, its methodology, results and conclusions; it is not a model, so no title or sentence may say "with HI-RIDE".
 
 ## Thesis, one paragraph
 
