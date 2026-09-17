@@ -3606,3 +3606,30 @@ conditions figure is unchanged.
 references, no overfull boxes, no Type 3 fonts, and a clean build from `latex_source.zip`.
 Cover letter (one page) and `SUBMISSION_CHECKLIST.md` rewritten. The open items of §14.18 are
 unchanged, the IRB statement in Section III-C is still red.
+
+### 14.20 2026-09-17, published figures checked in the cited papers
+
+The author asked where the abstract's "close to 100 % within a session, at most 30 % for single
+frames and 50 % for sequences across days" came from. Each value was re-read in the cited paper's
+own tables (`hiride2-results/lit-audit/extracts/`, plus the TranSG PDF from arXiv), which forced
+four corrections (papers commit after f1ec7b8).
+1. **Patruno et al. 2019 (97.84 %) is not a depth result.** Colour descriptors on coloured point
+   clouds plus skeleton posture; the BIWI test recordings were left out because the clothing
+   changes. The Introduction now leads with depth-only evidence, namely TUM-GAID (Hofmann 2014,
+   Table 6, depth gradient histogram energy image, 99.0 % rank-1 same session N, 50 % for the
+   16 people re-recorded in April 2012 after a January session, TN) and MultiGait (GaitBase on
+   depth silhouettes, 100 % single-session, 65.0–76.7 % multi-session, flagged as a preprint).
+2. **The single-frame bound holds for Walking only.** Wu et al. 2017 Table IV gives 30.5 % for
+   single Still frames (28 candidates). The abstract, cover letter and Discussion now say
+   "walking people".
+3. **Hafner et al. 2022**: 89.0 % colour and 44.5 % depth are RobotPKU (their Table 2). On BIWI
+   (Table 1) rank-1 is 92.1–94.8 % colour and 54.2–59.8 % depth, identity-disjoint, each person
+   in each clothing a separate instance, query and gallery from the same instance. The lit-audit
+   file 03_depthid_AUDIT_COMPLETE.md mislabels the RobotPKU row as BIWI; the Uddin 2023 survey's
+   "59.8 %" was right.
+4. **Delécluse et al. FG 2025, 60.7 % on BIWI depth sequences**, does not state which recordings
+   were matched, so Section VI-F names it and leaves it out of Table VI. TranSG (Rao and Miao,
+   CVPR 2023, Table 1) is 68.7 % rank-1 on BIWI-S but 32.7 % on BIWI-W with six-frame skeleton
+   sequences; Delécluse's table quoted the Still values, and the walking bound stands.
+Abstract now 246 words. Rule for later edits: quote a published number only after reading it in
+the source table, with its dataset, modality, protocol and decision unit.
