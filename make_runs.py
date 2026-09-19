@@ -516,11 +516,45 @@ WAVE24 = dict(
 )
 
 
+WAVE25 = dict(
+    doc="THE BLANK CELLS OF THE MECHANISM FIGURE (fig3_mechanism, Fig. 4 of the "
+        "manuscript). The figure draws nine conditions x four rungs x two "
+        "modalities and fourteen cells are empty. Eight of them are the RGB "
+        "silhouette and RGB normalised silhouette: apply_mask_condition builds "
+        "those two from the mask alone and discards `img` entirely, so an RGB "
+        "silhouette is the depth silhouette with its single channel repeated "
+        "three times. Running them would re-measure a cell already in the depth "
+        "panel, which is why wave 3 states 'silhouette is modality-free, so "
+        "once'. They are NOT run here; the figure marks them not applicable "
+        "instead. The remaining six are real gaps, and this wave fills them:\n"
+        "  interior_only depth at R0 and R3 -- the condition entered in wave 9, "
+        "which ran only R1 and R4, so the depth row has held two of four rungs "
+        "ever since.\n"
+        "  interior_only rgb at all four rungs -- never run in any modality but "
+        "depth. It is the one manipulation that separates clothing texture from "
+        "the outline, so the RGB row answers whether colour survives losing the "
+        "boundary the depth network depends on.\n"
+        "Baseline configuration throughout (gap head, no augmentation, no "
+        "tracklet fusion), matching the published mechanism cells so the new "
+        "cells sit in the same figure as the old ones. 6 cells x 5 seeds = 30 "
+        "cells, ~2-4 min each on a 1g.10gb slice, ~2 GPU-hours. Every line "
+        "carries --skip-existing: a re-run must never replace a seed by value.",
+    policies=[("R0_frame_random", ""),
+              ("R1_block", "--guard 150"),
+              ("R3_cross_recording", ""),
+              ("R4_cross_session", "")],
+    cells=[("interior_only", "depth", ("R0_frame_random", "R3_cross_recording")),
+           ("interior_only", "rgb", ("R0_frame_random", "R1_block",
+                                     "R3_cross_recording", "R4_cross_session"))],
+    seeds=[0, 1, 2, 3, 4],
+)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--wave", type=int, default=2,
                     choices=(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-                             19, 20, 21, 22, 23, 24))
+                             19, 20, 21, 22, 23, 24, 25))
     ap.add_argument("--scratch", action="store_true", help="wave 4: ConvNeXt from scratch")
     ap.add_argument("--control-seeds", type=int, default=3)
     args = ap.parse_args()
@@ -604,6 +638,16 @@ def main():
                     lines.append(f"--policy {policy} --modality {mod} --arch alexnet "
                                  f"--condition {cond} --seed {seed} {flags} "
                                  f"{WAVE15['extra']} {extra}".strip())
+    elif args.wave == 25:
+        for policy, extra in WAVE25["policies"]:
+            for cond, mod, rungs in WAVE25["cells"]:
+                if policy not in rungs:
+                    continue
+                for seed in WAVE25["seeds"]:
+                    lines.append(" ".join(
+                        f"--policy {policy} --modality {mod} --arch alexnet "
+                        f"--condition {cond} --seed {seed} {extra} "
+                        f"--skip-existing".split()))
     elif args.wave == 24:
         for policy, extra in WAVE24["policies"]:
             for cond, mod, flags in WAVE24["cells"]:

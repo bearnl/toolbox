@@ -3640,3 +3640,58 @@ paragraph of the Introduction now opens with it ("close to 100% ... but much low
 from different sessions") before the cited evidence, and the upper bound (30%, 50%) is attributed
 to BIWI RGBD-ID in the abstract, cover letter and Discussion, because MultiGait's cross-session
 65–77% exceeds it. Abstract 245 words.
+
+### 14.21 2026-09-18, the name removed from the manuscript
+
+**Author instruction 2026-09-18.** The paper does not name itself. "HI-RIDE" is dropped from the
+manuscript entirely, reversing the 2026-09-16 decision recorded in §14.18 and §14.19. The two
+occurrences in `paper-depth/main.tex` are gone: the Introduction now opens "In this paper, we
+address these questions on BIWI RGBD-ID ...", and the Conclusion opens "In this paper, we
+examined why published accuracies ...". The title is unchanged, "Human Identification and
+Recognition in Depth Imaging Environments", and so is the cover letter, which only ever used the
+title. No component was ever called HI-RIDE, so nothing else in the manuscript changed.
+
+**What still carries the name, deliberately.** `chen2025hiride` in `paper3/main.bib` is a BibTeX
+key and paper 3's prose calls this work HI-RIDE in its own sentences; that is paper 3's choice
+and is out of scope here. The toolbox, this handoff and the results directories keep the name as
+internal shorthand. `paper-depth/review/manuscript-extracted.txt` is text extracted from the
+previously compiled PDF and still contains both occurrences; it is regenerated from the PDF and
+was not edited.
+
+### 14.22 2026-09-18, the blank cells of the mechanism figure
+
+**What the author saw.** Fig. 4 of the manuscript (`fig3_mechanism`, nine conditions x four
+rungs x two modalities) has fourteen empty cells and the caption said only "Blank cells were not
+evaluated". Audited against `stats_final.json`: they are two kinds, and the figure drew both the
+same way, which reads as fourteen outstanding measurements.
+
+**Eight are not measurements at all.** `silhouette` and `sil_scaled` in the colour panel.
+`apply_mask_condition` builds both from the userMap alone and discards `img`, and the mask shard
+is `<tag>_mask.npy` for either modality, so a colour silhouette is the depth silhouette with its
+one channel repeated three times. Wave 3 already said it: "silhouette is modality-free, so
+once". Running them would re-measure a depth cell. `hiride_figures.fig_mechanism` now draws them
+grey with "n/a" (`MODALITY_FREE`), the caption states why, and the figure in `paper-depth/figs`
+was regenerated from the same `stats_final.json`: every printed number is unchanged, byte
+comparison of the extracted text shows only the eight n/a labels added.
+
+**Six are real gaps.** `interior_only` depth at R0_frame_random and R3_cross_recording (wave 9
+introduced the condition and ran only R1 and R4), and `interior_only` rgb at all four rungs
+(never run in any modality but depth). The colour row is the one worth having: interior_only is
+the single manipulation that separates clothing texture from the outline, so it answers whether
+colour survives losing the boundary the depth network depends on. WAVE25 in `make_runs.py` fills
+exactly these, baseline configuration, 5 seeds, 30 cells, ~2 GPU-hours, every line
+`--skip-existing`:
+
+    cd ~/toolbox && source ~/venvs/venv311/bin/activate
+    python make_runs.py --wave 25 > runs25.txt        # 30 lines
+    sbatch --account=def-czarnuch_gpu --array=1-30%8 \
+           --export=ALL,RUNS_FILE=$PWD/runs25.txt run_hiride.slurm
+    python hiride_collate.py --runs $SCRATCH/hiride2/runs --floor $SCRATCH/hiride2/results
+
+After collating, regenerate `stats_final.json`, redraw the figure and drop "Blank cells were not
+evaluated." from the caption. `fig_mechanism` now prints one line per still-missing cell, so the
+caption and the figure cannot drift apart unnoticed.
+
+**Not done.** The runs themselves; the cluster is the author's to drive. Nothing in the
+manuscript depends on the six cells, so the current figure and caption are submittable as they
+stand.

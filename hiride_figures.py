@@ -22,6 +22,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+from matplotlib.patches import Rectangle
 # IEEE PDF eXpress rejects Type 3 fonts, which matplotlib embeds by default;
 # TrueType (42) passes and keeps figure text selectable.
 plt.rcParams.update({"pdf.fonttype": 42, "ps.fonttype": 42})
@@ -239,6 +240,15 @@ def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
     save(fig, out, "fig2_ladder")
 
 
+# The silhouette conditions are built from the person mask alone --
+# apply_mask_condition discards `img` and returns a binary image -- so the colour
+# arm of each is the depth arm with one channel repeated three times, not a
+# second measurement. Wave 3 put it as "silhouette is modality-free, so once".
+# The figure marked those eight cells the same way it marked cells nobody had
+# run, which invited the reading that eight measurements were outstanding.
+MODALITY_FREE = ("silhouette", "sil_scaled")
+
+
 def fig_mechanism(stats, out, arch="alexnet"):
     """Figure 3 -- the mechanism suite as conditions x rungs, one panel per modality."""
     conds = ["full", "person", "bg_hole", "bg_plate", "silhouette",
@@ -266,6 +276,14 @@ def fig_mechanism(stats, out, arch="alexnet"):
                 if np.isfinite(M[i, j]):
                     ax.text(j, i, f"{M[i, j]:.0f}", ha="center", va="center", fontsize=7,
                             color="white" if M[i, j] < 55 else "black")
+                elif mod != "depth" and conds[i] in MODALITY_FREE:
+                    ax.add_patch(Rectangle((j - 0.5, i - 0.5), 1, 1, facecolor="#d9d9d9",
+                                           edgecolor="none", zorder=2))
+                    ax.text(j, i, "n/a", ha="center", va="center", fontsize=7,
+                            color="#444444", zorder=3)
+                else:
+                    print(f"    fig3: {mod} {conds[i]} not run at {RUNGS[j]} "
+                          f"-- left empty, NOT substituted")
     if not any_drawn:
         print("  (fig3 skipped: no mechanism cells)")
         plt.close(fig)
