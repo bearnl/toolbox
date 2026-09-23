@@ -3860,3 +3860,24 @@ tightening three new sentences. Numeric tokens diffed: only the intended changes
 Both now use `joint_cluster_boot`; `bash submit_review_aux.sh` (one CPU job) regenerates
 `aux_dist.txt` and `fusion.json`, after which the distance sentence must be re-read, since
 narrower intervals may no longer all include zero. Ethics statement still open.
+
+### 14.26 2026-09-23, the pre-registered tests under the joint bootstrap; review closed
+
+Job 22548444 (`submit_review_aux.sh`) completed; `aux_dist.txt` and `fusion.json` rsynced
+(previous `fusion.json` in `pre_review/`). Point estimates identical; intervals narrower.
+
+- **Distance as an extra input (Section VI-H, Table VII).** Mean changes unchanged (−0.58 pp size
+  kept, −0.50 pp size removed; verdict NO EFFECT). "Every confidence interval included zero" is no
+  longer true: across sessions the normalised person LOST 3.7 pp [−7.3, −0.3] with the distance,
+  in line with the anthropometric classifier's finding that the distance identifies the recording.
+  Upper limits are at most +2.2 pp under cross-recording (was +2.4) and +7.1 pp across sessions,
+  both below the 10 pp gap the hypothesis had to explain. Text and the Table VII row updated.
+- **Combination oracle.** Either-minus-metric 7.7 / 9.0 / 8.3 pp, all still excluding zero. One
+  contrast changed side: the product rule (`geo`, the rule of Section IV-E) with the CNN trained
+  from scratch on the normalised silhouette now beats the anthropometric classifier by +2.9 pp
+  [+0.1, +5.8] at frame level (was [−2.8, +8.8]). The text now states it; "no comparable
+  improvement" to the oracle's 7.7-9.0 pp still holds, and Table VII's row stands.
+
+Paper builds at 16 pages, no overfull boxes; numeric diff shows only these changes. Every interval
+in the manuscript now comes from `joint_cluster_boot`. Open: the ethics statement (author records)
+and the papers commit (author to choose one commit or one per task).
