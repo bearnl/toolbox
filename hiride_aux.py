@@ -34,7 +34,7 @@ import argparse
 import numpy as np
 
 from hiride_data import load_manifest
-from hiride_stats import cluster_boot, boot_rng
+from hiride_stats import joint_cluster_boot, boot_rng
 from hiride_fuse import cnn_cells
 
 SIZE_KEPT = ("person", "person_centred")
@@ -77,10 +77,8 @@ def main():
                 diffs.append((ao - bo, subj_all[B["test_rows"]]))
             if not diffs:
                 continue
-            cis = [cluster_boot(d, s, boot_rng(args.seed, ("aux", policy, cond, i)),
-                                args.boot) for i, (d, s) in enumerate(diffs)]
-            lo = float(np.mean([c[0] for c in cis])) * 100
-            hi = float(np.mean([c[1] for c in cis])) * 100
+            lo, hi = joint_cluster_boot(diffs, boot_rng(args.seed, ("aux", policy, cond)), args.boot)
+            lo, hi = lo * 100, hi * 100
             d = (np.mean(a1) - np.mean(a0)) * 100
             tag = "kept" if cond in SIZE_KEPT else "removed"
             star = "" if lo * hi > 0 else "  (straddles 0)"

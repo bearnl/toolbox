@@ -57,7 +57,7 @@ import numpy as np
 from hiride_data import load_manifest, make_split, eligible_mask
 from hiride_keys import cond_key, arch_key
 from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
-from hiride_stats import cluster_boot, boot_rng
+from hiride_stats import joint_cluster_boot, boot_rng
 
 
 def cnn_cells(runs, policy, modality, arch, condition):
@@ -276,12 +276,10 @@ def main():
         cis = {}
         for a, b in (("fused", "cnn"), ("fused", "metric"),
                      ("geo", "cnn"), ("geo", "metric"), ("either", "metric")):
-            per = [cluster_boot(P[a].astype(float) - P[b].astype(float), P["subj"],
-                                boot_rng(args.seed, ("fuse", cond, a, b, P["seed"])),
-                                args.boot) for P in paired]
-            cis[f"{a}-{b}"] = [float(np.mean([c[0] for c in per])),
-                               float(np.mean([c[1] for c in per]))]
-        print(f"  paired contrasts (subject-cluster CI, mean over {len(paired)} seeds):")
+            cis[f"{a}-{b}"] = list(joint_cluster_boot(
+                [(P[a].astype(float) - P[b].astype(float), P["subj"]) for P in paired],
+                boot_rng(args.seed, ("fuse", cond, a, b)), args.boot))
+        print(f"  paired contrasts (subject-cluster CI, joint over {len(paired)} seeds):")
         for k, (lo, hi) in cis.items():
             a, b = k.split("-")
             d = 100 * (mean[a] - mean[b])

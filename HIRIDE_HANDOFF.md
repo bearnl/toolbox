@@ -3815,3 +3815,48 @@ cell); restate Section V-D as the joint construction; redraw Figs 2 and 5 (bands
 "interval included / excluded zero" sentence. Add the observed plurality to Section VI-E and, if
 it supports it, a like-for-like statement on dependence. Add the measured window duration to
 Section IV-D.
+
+### 14.25 2026-09-23, the review reruns collected; the paper updated; one more small job
+
+**Collected.** The four jobs of §14.24 regenerated all 22 files (backups of the previous 20 in
+`hiride2-results/pre_review/`). Every point estimate is identical to before; only intervals moved.
+The one exception is the metric floor's permutation `null`, which changed in the fourth significant
+figure in 13 of 60 entries (one frame of one shuffled-label draw: a random forest trained on
+shuffled labels ties between classes, and its multi-threaded probability sum can break a tie
+differently between runs). The null is not quoted in the paper.
+
+**What the joint intervals changed.** They are narrower, as expected (TVRID frame-random
+[57.1, 67.9] → [58.8, 66.3]; ConvNeXt 25.9 % [19.2, 33.0] → [19.6, 32.5]; the metric floors are
+unchanged at one decimal because the forest's seeds barely differ). Every "includes / excludes
+zero" statement about the window contrasts survives. One conclusion REVERSES: cross-session
+condition-vs-full contrasts (CNN trained from scratch, baseline, `condition_contrasts`) now exclude
+zero for the normalised person +6.9 pp [+2.8, +10.9], the normalised silhouette +6.3 [+2.2, +9.9]
+and interior only +5.0 [+1.5, +8.4]; the person only, re-centred person and silhouette still
+include zero. The joint interval is conditional on the five trained networks, so the variance of
+the seed mean (per-seed SD over √5, from `conditions`) was added to the bootstrap variance as a
+check: seed SDs are 0.75-1.21 pp for those three, and no interval changed side (only the 2-bit
+contrast flips, seed SD 4.97, not discussed there). §8.3 / §13.11's withdrawn claim ("the only R4
+contrast that excludes zero") is thereby superseded by a stronger one under the joint construction.
+
+**Plurality, like for like (`errors_*_gated_mean.json`, W = 25).** Independent-frames plurality
+30.9 / 51.5 / 49.4 % (CNN from scratch / anthropometric / pretrained CNN); observed plurality 28.3 /
+42.7 / 46.0 %. Dependence costs the CNNs 2.6 and 3.4 pp but the anthropometric classifier 8.8 pp;
+on the same windows the sum rule gives 27.6 / 48.2 / 47.8 %.
+
+**Window duration (`window_span`, W = 25).** Walking, full-body: median 72.9 frame intervals, i.e.
+7.3 s at 10 fps, quartiles 5.3-11.3 s, 90th percentile 12.8 s, max 17.7 s (103 windows).
+Walking, no frame selection: median 2.75 s. Still, full-body: median 2.65 s. The old "2.5 s" was a
+third of the real duration for the headline 48.2 % and 61.4 %.
+
+**Paper.** All 21 intervals replaced from the files (formatted programmatically), Section V-D
+describes the joint construction, Section VI-B states the three contrasts and the seed check,
+Section VI-E has the like-for-like plurality, Section IV-D and the Discussion give the measured
+duration, Figs 2 and 5 redrawn (narrower bands; Fig. 5 lost its 60 % tick). 16 pages after
+tightening three new sentences. Numeric tokens diffed: only the intended changes.
+
+**Still to do.** Table VII's two pre-registered tests (Section VI-H) quote intervals from
+`hiride_aux.py` (distance input: "every confidence interval included zero", "±2.4 pp") and
+`hiride_fuse.py` (oracle 7.7-9.0 pp, "excluded zero"), which still averaged per-seed endpoints.
+Both now use `joint_cluster_boot`; `bash submit_review_aux.sh` (one CPU job) regenerates
+`aux_dist.txt` and `fusion.json`, after which the distance sentence must be re-read, since
+narrower intervals may no longer all include zero. Ethics statement still open.
