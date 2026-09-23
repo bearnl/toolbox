@@ -314,8 +314,9 @@ def _policy_cross(man, rng, train_seq, test_seq, val_frac=0.15, guard=50,
                   train_all_subjects=False, **kw):
     """R3/R4 -- train on one sequence, test on another, restricted to subjects
     that appear in both.  R3 changes the recording; R4 changes the day AND the
-    clothing.  Test set is byte-identical between them, so the R3->R4 delta
-    isolates session+clothing.
+    clothing.  The test set is byte-identical between them, but R3 trains on the
+    short Still recordings and R4 on the Training recordings, so the R3->R4 delta
+    also carries posture and training-set size, not session+clothing alone.
 
     `train_all_subjects=True` is the field's BIWI protocol (Haque et al. 2016,
     Karianakis et al. 2018): EVERY recording of `train_seq` trains, so the

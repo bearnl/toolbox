@@ -3881,3 +3881,38 @@ Job 22548444 (`submit_review_aux.sh`) completed; `aux_dist.txt` and `fusion.json
 Paper builds at 16 pages, no overfull boxes; numeric diff shows only these changes. Every interval
 in the manuscript now comes from `joint_cluster_boot`. Open: the ethics statement (author records)
 and the papers commit (author to choose one commit or one per task).
+
+### 14.27 2026-09-23, second review round (GPT), verified before acting
+
+Nine points, each checked against the code and results. Seven held as stated, two in part:
+
+- **Held, fixed.** (1) The frame-random split is 72/8/20 (`_policy_R0`: test 20 %, then validation
+  10 % of the remaining 80 %), not 70/10/20, and block hold-out validation is the preceding 8 % of
+  each recording; text and Table I corrected. (2) The permutation baseline shuffles labels over
+  train, validation AND test rows (`hiride_train.py:1038`), not the training set alone. (3)
+  Full-frame accuracy across sessions was 1.1-2.4 pp above the majority rate and the permutation
+  baseline, not "within one point"; with joint intervals [2.7, 11.5] (depth) and [0.5, 12.5]
+  (colour) that include both, the text now says no EVIDENCE of identity information rather than
+  none retained. (4) Section VI-C said the anthropometric classifier was less accurate than the
+  mask-and-depth baseline and the CNN within a session; it beats the baseline under every protocol
+  (92.1 vs 89.4, 68.0 vs 17.7, 15.6 vs 8.5, 19.0 vs 5.4) and the CNN under block hold-out (68.0 vs
+  62.3). (5) "The highest accuracies in Table VI, 45.3-50.0 %" contradicted the table's own 62.1 %,
+  an error introduced in §14.24; now "highest published". (6) The plurality gap is not
+  like-for-like after all: `iid_ceiling` weights people by retained frames, the observed accuracy
+  by windows, and the confusion rows include frames outside complete windows. The text now reports
+  the gaps descriptively and says they are not due to dependence alone. (7) 7.3 s is 73 frame
+  intervals converted at the documented ~10 fps; now stated as approximate.
+- **Held in part.** (8) The 9 pp binomial SE: GPT asked for it to be removed. Kept as a conditional
+  illustration (one independent decision per person), dropped from the Table VI caption, and
+  "differences of a few points are not meaningful" softened to "should be interpreted with
+  caution". (9) Literature bound: body sentences now say "the studies that state this protocol";
+  the abstract keeps its wording (word limit, and nothing cited contradicts it).
+- **Open.** Ethics statement (author records).
+
+Also corrected: the `_policy_cross` docstring's "R3->R4 isolates session+clothing".
+
+**Build note.** On `/Volumes/Workspace` a file can be read before it is fully written: two builds
+reported a damaged PDF and one a truncated `.aux` ("File ended while scanning use of
+\@writefile"). Build in local scratch (`latexmk -outdir=<scratch>`) and copy the finished PDF
+into `build/`. The paper stays at 16 pages with every float on its previous page; three rounds of
+tightening recovered the lines this round added.
