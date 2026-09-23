@@ -3695,3 +3695,44 @@ caption and the figure cannot drift apart unnoticed.
 **Not done.** The runs themselves; the cluster is the author's to drive. Nothing in the
 manuscript depends on the six cells, so the current figure and caption are submittable as they
 stand.
+
+### 14.23 2026-09-22, wave 25 collected; the mechanism figure has no blank cells left
+
+**Runs.** Array 22258854, 30/30 COMPLETED; analysis 22504185 (retag, collate, `hiride_stats.py
+--boot 20000`, report), rsynced to `hiride2-results/`. `stats_final.json` 192 → 198 cells; the
+pre-wave copy is kept as `stats_final_pre_w25.json`. Every one of the 192 existing cells is
+identical in all fields (means, SDs, CIs), as the per-key bootstrap streams of §13.7 promise,
+so no interval printed in the paper moved.
+
+**The six cells (baseline configuration, 5 seeds, mean, CI over people):**
+
+| | frame-random | block hold-out | cross-recording | cross-session |
+|---|---|---|---|---|
+| interior only, depth | **68.86** [62.5, 74.8] | 38.22 (wave 9) | **13.83** [8.5, 20.1] | 11.67 (wave 9) |
+| interior only, colour | **91.38** [86.9, 95.1] | **98.63** [97.3, 99.5] | **62.18** [53.8, 70.4] | **17.24** [6.0, 30.0] |
+
+Colour interior only under frame-random is below block hold-out, the only inversion in either
+panel. It is seed instability, not a data effect: seeds split 99.9, 99.7 against 84.2, 88.1,
+84.9, while block hold-out sits at 97.5 to 99.2. Depth under frame-random spreads the same way
+(56.4 to 81.4). Across sessions colour loses almost nothing to the erosion (17.2 against 17.7
+for the normalised person), depth about 2 pp (11.7 against 13.6).
+
+**Knock-on 1, Fig. 3.** The paired block grew by 20 records (interior only now has both
+modalities at every rung), so the colour-minus-depth means over all networks and manipulations
+moved from 19.5 / 38.7 / 33.4 / 1.3 to **20.1 / 40.5 / 35.3 / 1.6 pp**. The old values are
+reproduced exactly from `stats_final_pre_w25.json`, and the saturated count is still three.
+Section V-A's sentence and `figs/fig1_collapse.pdf` updated; the collapse across sessions stands.
+
+**Knock-on 2, Table III.** The depth mechanism table now carries the interior-only row
+(68.86 ± 10.58, 38.22 ± 3.43, 13.83 ± 1.17, 11.67 ± 1.09), so it and Fig. 4 list the same
+conditions. `hiride_report.py` gained `interior_only` in `COND_ORDER`; erode variants key as
+`interior_only/e{N}` (hiride_keys) and cannot leak into the row. **SD convention:** the paper's
+tables print the sample SD (n−1, `hiride_report.agg`), whereas `stats_final.json`'s
+`frame_acc_sd` is the population SD; the two differ by √(5/4). The new row was computed from the
+per-seed accuracies in `stats_final.json['conditions']` with n−1, after checking that the same
+computation reproduces all 28 existing non-full depth cells of `tables.tex` exactly. The local
+`tables.tex` predates the report change; the next analysis job regenerates it with the row.
+
+**Unchanged, checked by extracted text:** Fig. 2 (ladder) and Fig. 5 (bits). Paper rebuilds at
+16 pages, no overfull boxes.
+

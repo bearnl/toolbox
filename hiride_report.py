@@ -49,11 +49,12 @@ SHORT = {"R0_frame_random": "R0 frame-random", "R1_block": "R1 block g150",
 ARCH_LABEL = {"alexnet": "alexnet", "convnext_tiny": "cnxt-imagenet",
               "convnext_tiny/scratch": "cnxt-scratch"}
 COND_ORDER = ["full", "person", "person_centred", "scale_removed", "bg_hole",
-              "bg_plate", "silhouette", "sil_scaled"]
+              "bg_plate", "silhouette", "sil_scaled", "interior_only"]
 COND_LABEL = {"full": "full frame", "person": "person only",
               "person_centred": "person, re-centred", "scale_removed": "person, size+position removed",
               "bg_hole": "person removed (hole kept)", "bg_plate": "person removed (plate, no hole)",
-              "silhouette": "silhouette", "sil_scaled": "silhouette, size+position removed"}
+              "silhouette": "silhouette", "sil_scaled": "silhouette, size+position removed",
+              "interior_only": "interior only"}
 
 
 def load(runs):
