@@ -183,7 +183,7 @@ def fig_ladder(stats, out, condition="scale_removed", arch="alexnet",
                     continue
                 c = max(c, key=lambda r: r["n_seeds"])
                 xs.append(i); ys.append(c["frame_acc_mean"] * 100)
-                los.append(c["subj_ci_lo_mean"] * 100); his.append(c["subj_ci_hi_mean"] * 100)
+                los.append(c["subj_ci_lo"] * 100); his.append(c["subj_ci_hi"] * 100)
             if not xs:
                 continue
             drawn = True
@@ -313,7 +313,7 @@ def fig_bits(stats, out):
                     or c.get("eligibility", "cues") != "cues"):
                 continue
             pts.append((c.get("bits", 16), c["frame_acc_mean"] * 100,
-                        c["subj_ci_lo_mean"] * 100, c["subj_ci_hi_mean"] * 100,
+                        c["subj_ci_lo"] * 100, c["subj_ci_hi"] * 100,
                         c["n_seeds"]))
         if not pts:
             continue

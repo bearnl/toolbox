@@ -3736,3 +3736,82 @@ computation reproduces all 28 existing non-full depth cells of `tables.tex` exac
 **Unchanged, checked by extracted text:** Fig. 2 (ladder) and Fig. 5 (bits). Paper rebuilds at
 16 pages, no overfull boxes.
 
+### 14.24 2026-09-23, an external review of the manuscript, verified; text fixed, three reruns
+
+**The review.** Eight comments from another model (GPT), passed on by the author with "do not
+blindly accept". Each was checked against the code, the result JSONs and the paper before
+anything changed. All eight diagnoses were right; three of its rewrites were wrong in detail, and
+it missed as many instances again. The findings, with the evidence:
+
+1. **Combination rule.** The paper said "averaging their class probabilities with equal weights"
+   (Section IV-E, Table VI caption). Every combined number is `hiride_sequence.py:220`, a
+   per-frame NORMALISED PRODUCT of (p+1e-12), then the sum rule over frames; 61.4 % reproduces
+   from `sequence_cnxt-mean_R4_cross_session_gated.json` (geo, W=25, 0.6136). Now Eq. (1).
+2. **Quantisation.** `quantise_depth` runs on the raw clipped depth (`hiride_train.py:614`)
+   BEFORE `scale_remove` shifts and bilinearly resizes the person (`:318`, order=1); the mask is
+   resized separately (order=0). The paper's 1-bit explanation ("a threshold at 3 m cuts a body
+   whose median has been shifted to 3 m") had the order wrong and is also contradicted by the
+   2-bit quantiser, whose levels share the 3 m boundary and keep 12.2 %. "The accuracy did not
+   change" (2 bits) and "as accurate with 2 bits as with 16" were equivalence claims against a
+   2-bit seed SD of 5.04. Not found by the reviewer: the within-session sentence "because depth
+   values encode the distance of the person and the scene" described information the normalised
+   person does not contain (median shifted to 3 m, background removed).
+3. **"2.5 s".** Windows are 25 RETAINED frames (`windows()`), so gated windows skip excluded
+   frames; 2.5 s held only without exclusions. Removed from the abstract, contributions,
+   Discussion and Conclusion; Section IV-D now states the window rule exactly.
+4. **Intervals.** Every reported interval was the MEAN OF FIVE PER-SEED ENDPOINTS
+   (`hiride_stats.py`, `hiride_sequence.py`, `hiride_metric_floor.py`), and Section V-D did not
+   say so. The text now describes that construction; the joint bootstrap below replaces it. The
+   4.9 pp "standard error" treated 103 windows of 28 people as independent and was dropped; the
+   9 pp binomial SE for 28 per-person decisions is kept and labelled binomial.
+5. **Protocol partition.** The frame-random and block test sets differ (3,703 vs 3,724 frames,
+   table under §8); the session step also changes 50 to 28 candidates, the test recordings and the
+   training size. §8's "each step changes exactly one thing" is therefore wrong for two of the
+   four steps, and the paper no longer calls the steps an additive decomposition. The gap sweep
+   (byte-identical test frames) and the training-size step (same test set) remain controlled.
+   R3 vs R4 does not "isolate the change of session": R3 trains on Still (posture, ~65 frames per
+   person). The "bounding-box baseline" is 13 features (`hiride_prep.py:39`), 7 of them depth or
+   image-edge contact; renamed the **mask-and-depth baseline** and defined feature by feature.
+6. **Literature.** Line 411's "therefore do not show ... in other recordings" contradicted the
+   Introduction's own MultiGait 65-77 % across sessions; rewritten. "Highest published" was
+   already scoped to the standard protocol (Delécluse's 60.7 % states no protocol, Section VI-F),
+   and the scope is now explicit ("at most 50.0 % in published studies that state this protocol").
+7. **Equivalence and independence.** −0.4 pp [−18.4, +17.4] cannot show equality; "equally
+   accurate", "the same as a pretrained network" and "interpretability did not require a loss of
+   accuracy" are now "similar" with the interval stated. The independent-frames benchmark is a
+   PLURALITY vote (`iid_ceiling`), compared with SUM-RULE accuracy: different rules, so the
+   "recovered almost all of the improvement" and "limited by its confusion matrix" sentences were
+   removed; the product-vs-sum comparison stays where it is like-for-like (Section VI-C,
+   43.3 → 48.2 %).
+8. **Ethics.** Unchanged; needs the author's records (committee, approval number, date, consent).
+
+The same fixes went into the cover letter and the portal abstract in `SUBMISSION_CHECKLIST.md`.
+Abstract 248 words (limit 250). Numeric tokens diffed before/after: only intended changes.
+
+**Code (this commit).**
+- `hiride_stats.joint_cluster_boot(parts, rng, n_boot)`: one resample of subjects per replicate,
+  shared by all seeds, statistic = mean over seeds. Equals `cluster_boot` exactly for one seed
+  (tested); raises if a replicate has no frame for some seed. Used for every cell interval
+  (fields renamed `subj_ci_lo` / `subj_ci_hi`; `hiride_figures.py` updated; no old names kept),
+  for a new `condition_contrasts` block (seed-pooled condition-vs-full, the source of the 6.9 pp
+  [−0.9, +14.8] sentence), in `hiride_sequence.py` (window intervals and paired contrasts) and
+  in `hiride_metric_floor.py`. Per-seed records keep their own per-seed `ci`.
+- `hiride_sequence.window_spans`: duration of every decision window in median frame intervals of
+  its recording (timestamp unit undocumented, so no unit is assumed), stored as `window_span`
+  per W; raises if seeds decide on different windows.
+- `hiride_errors.py`: `acc[m]["plurality"]`, the plurality of the observed frames of each window,
+  the like-for-like partner of the i.i.d. ceiling.
+
+**Reruns.** `bash submit_review_reruns.sh` on Nibi: four CPU jobs, 0 GPU-hours, same invocations
+and output names as before (stats BIWI + TVRID + both metric floors; 12 sequence files; 4 error
+files). Then `bash collect_review.sh`.
+
+**When the files are back, in the paper.** Replace all 21 intervals with the joint ones: TVRID
+(Section VI-A, `stats_tvrid.json` cells), 6.9 pp (`stats_final.json` `condition_contrasts`, R4
+depth alexnet scale_removed), 19.0 and 28.1 % (`metric_floor.json`, `metric_floor_fbtest.json`),
+the Section VI-C and VI-E window intervals and contrasts (`sequence_{alexnet,cnxt}-mean_R4_
+cross_session_{gated,ungated}.json`, `ci` and `contrasts`), 25.9 % (`stats_final.json`, ConvNeXt
+cell); restate Section V-D as the joint construction; redraw Figs 2 and 5 (bands); re-read every
+"interval included / excluded zero" sentence. Add the observed plurality to Section VI-E and, if
+it supports it, a like-for-like statement on dependence. Add the measured window duration to
+Section IV-D.

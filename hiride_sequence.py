@@ -42,7 +42,7 @@ import argparse
 import numpy as np
 
 from hiride_data import load_manifest, make_split, eligible_mask
-from hiride_stats import cluster_boot, boot_rng
+from hiride_stats import joint_cluster_boot, boot_rng
 from hiride_fuse import cnn_cells, load_metric, select_columns
 
 
@@ -69,6 +69,34 @@ def agg_windows(F, rec, frame, w, stride):
         blocks.extend(m[i:i + w] for i in range(0, len(m) - w + 1, stride))
     X = np.stack([F[b].mean(0) for b in blocks]).astype(np.float32)
     return X, blocks
+
+
+def window_spans(rec, frame, ts, rec_ref, frame_ref, ts_ref, W):
+    """Duration of every decision window, counted in frame intervals of its recording.
+
+    A window holds w RETAINED frames, and frames removed by frame selection leave
+    gaps inside it, so its duration is not w frame intervals. The interval of a
+    recording is the median timestamp difference between consecutive frames among
+    all of its test frames (`rec_ref`, `frame_ref`, `ts_ref`), which makes the count
+    independent of the timestamp unit, which BIWI does not document. A window of w
+    consecutive frames counts w.
+    """
+    step = {}
+    for r in np.unique(rec_ref):
+        m = np.flatnonzero(rec_ref == r)
+        m = m[np.argsort(frame_ref[m])]
+        if len(m) > 1:
+            step[r] = float(np.median(np.diff(ts_ref[m])))
+    out = {}
+    for w in W:
+        spans = []
+        for r in np.unique(rec):
+            m = np.flatnonzero(rec == r)
+            m = m[np.argsort(frame[m])]
+            for blk in windows(m, w):
+                spans.append((ts[blk[-1]] - ts[blk[0]]) / step[r] + 1.0)
+        out[str(w)] = np.array(spans)
+    return out
 
 
 def windows(order, w):
@@ -178,6 +206,7 @@ def main():
         acc = {k: {w: [] for w in W} for k in KEYS}
         ndec = {w: [] for w in W}
         tail = {k: [] for k in ("cnn", "metric", "geo")}
+        spans = []
         for meta, cm_path in cells:
             seed = int(meta["seed"])
             d = np.load(cm_path, allow_pickle=False)
@@ -226,6 +255,13 @@ def main():
                                 np.asarray(man["subject"], str)[rows_s],
                                 np.asarray(man["session"], str)[rows_s])])
             frame = np.asarray(man["frame"])[rows_s].astype(np.int64)
+            rec_ref = np.array([f"{a}|{b}|{c}" for a, b, c in
+                                zip(np.asarray(man["seq"], str)[te_rows],
+                                    np.asarray(man["subject"], str)[te_rows],
+                                    np.asarray(man["session"], str)[te_rows])])
+            spans.append(window_spans(rec, frame, np.asarray(man["ts"])[rows_s].astype(np.float64),
+                                      rec_ref, np.asarray(man["frame"])[te_rows].astype(np.int64),
+                                      np.asarray(man["ts"])[te_rows].astype(np.float64), W))
             # training-side recordings, for the window-averaged feature model
             tr_rec = np.array([f"{a}|{b}|{c}" for a, b, c in
                                zip(np.asarray(man["seq"], str)[tr],
@@ -291,17 +327,14 @@ def main():
                             for k in ("met_agg", "geo_agg")))
         lab = ("whole tracklet" if args.ci_window <= 0
                else f"{args.ci_window} frames/decision")
-        print(f"  subject-cluster CI at {lab} (mean over seeds, "
+        print(f"  subject-cluster CI at {lab} (joint over seeds, "
               f"{int(np.mean(ndec[args.ci_window])) if args.ci_window in ndec else '?'} "
               f"decisions):")
         cis = {}
         for k in ("cnn", "metric", "geo"):
-            per = [cluster_boot(d["cor"], d["sub"],
-                                boot_rng(args.seed, ("seq", cond, k, args.ci_window, i)),
-                                args.boot)
-                   for i, d in enumerate(tail[k])]
-            cis[k] = [float(np.mean([p[0] for p in per])),
-                      float(np.mean([p[1] for p in per]))]
+            cis[k] = list(joint_cluster_boot([(d["cor"], d["sub"]) for d in tail[k]],
+                                             boot_rng(args.seed, ("seq", cond, k, args.ci_window)),
+                                             args.boot))
             print(f"    {k:<8s}{100 * np.mean(acc[k].get(args.ci_window, acc[k][0])):>7.2f}%  "
                   f"[{100 * cis[k][0]:+.1f}, {100 * cis[k][1]:+.1f}]")
 
@@ -314,17 +347,15 @@ def main():
         contrasts = {}
         print(f"  paired contrasts at {lab} (same decisions, subject-cluster CI):")
         for a, b in (("geo", "metric"), ("cnn", "metric"), ("geo", "cnn")):
-            per, dmeans = [], []
-            for i, (da, db) in enumerate(zip(tail[a], tail[b])):
+            parts, dmeans = [], []
+            for da, db in zip(tail[a], tail[b]):
                 assert len(da["cor"]) == len(db["cor"])
                 diff = da["cor"] - db["cor"]
                 dmeans.append(float(diff.mean()))
-                per.append(cluster_boot(diff, da["sub"],
-                                        boot_rng(args.seed, ("seqpair", cond, a, b,
-                                                             args.ci_window, i)),
-                                        args.boot))
-            lo = float(np.mean([p[0] for p in per]))
-            hi = float(np.mean([p[1] for p in per]))
+                parts.append((diff, da["sub"]))
+            lo, hi = joint_cluster_boot(parts, boot_rng(args.seed, ("seqpair", cond, a, b,
+                                                                    args.ci_window)),
+                                        args.boot)
             contrasts[f"{a}-{b}"] = dict(diff=float(np.mean(dmeans)), ci=[lo, hi])
             flag = "" if lo * hi > 0 else "   (interval straddles zero)"
             print(f"    {a}-{b:<12s}{100 * np.mean(dmeans):>+7.2f} pp  "
@@ -386,13 +417,32 @@ def main():
             print(f"  answer-when-sure (geo): at {100 * mid['coverage']:.0f}% coverage, "
                   f"accuracy {100 * mid['acc']:.1f}% (threshold {mid['threshold']:.2f})")
 
+        for w in W:
+            first = spans[0][str(w)]
+            if any(not np.array_equal(sp[str(w)], first) for sp in spans[1:]):
+                raise ValueError(f"{cond}: the seeds decide on different windows at w={w}, "
+                                 f"so one set of window durations does not describe them")
+        span_summary = {str(w): dict(n=int(len(spans[0][str(w)])),
+                                     median=float(np.median(spans[0][str(w)])),
+                                     p25=float(np.percentile(spans[0][str(w)], 25)),
+                                     p75=float(np.percentile(spans[0][str(w)], 75)),
+                                     p90=float(np.percentile(spans[0][str(w)], 90)),
+                                     max=float(np.max(spans[0][str(w)])))
+                        for w in W}
+        s25 = span_summary.get(str(args.ci_window))
+        if s25:
+            print(f"  window duration at {lab}, in frame intervals: median {s25['median']:.1f}, "
+                  f"quartiles {s25['p25']:.1f}-{s25['p75']:.1f}, 90th percentile {s25['p90']:.1f}, "
+                  f"max {s25['max']:.1f} ({s25['n']} windows)")
+
         report[cond] = dict(windows=W,
                             acc={k: {str(w): float(np.mean(v)) for w, v in d.items()}
                                  for k, d in acc.items()},
                             n_decisions={str(w): float(np.mean(v)) for w, v in ndec.items()},
                             ci_window=args.ci_window, ci=cis,
                             contrasts=contrasts, topk=topk,
-                            per_subject=per_subj, coverage=coverage)
+                            per_subject=per_subj, coverage=coverage,
+                            window_span=span_summary)
 
     if args.out:
         # settings travel WITH the numbers: a curve read months later must say

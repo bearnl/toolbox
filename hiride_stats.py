@@ -83,6 +83,37 @@ def cluster_boot(correct, subj, rng, n_boot):
     return float(np.percentile(stats, 2.5)), float(np.percentile(stats, 97.5))
 
 
+def joint_cluster_boot(parts, rng, n_boot):
+    """Bootstrap a seed-averaged accuracy by resampling SUBJECTS once for all seeds.
+
+    `parts` holds one (values, subjects) pair per seed. Each replicate draws one
+    set of subjects with replacement from those present in any seed, evaluates
+    every seed on the frames of the drawn subjects and averages the seeds, so the
+    interval belongs to the seed-averaged number that is reported and the subject
+    sampling is shared by all seeds, as it is in the data. Separate per-seed
+    intervals with averaged endpoints describe a single seed instead.
+
+    A replicate in which some seed has no frame at all has no defined accuracy
+    for that seed, which only happens when the seeds do not share their test
+    subjects, so it raises instead of returning an interval.
+    """
+    subjects = np.unique(np.concatenate([np.asarray(s, dtype=str) for _, s in parts]))
+    k = len(subjects)
+    pick = rng.integers(0, k, size=(n_boot, k))
+    stats = np.zeros(n_boot)
+    for values, subj in parts:
+        idx = np.searchsorted(subjects, np.asarray(subj, dtype=str))
+        sums = np.bincount(idx, weights=np.asarray(values, dtype=np.float64), minlength=k)
+        cnts = np.bincount(idx, minlength=k).astype(np.float64)
+        den = cnts[pick].sum(axis=1)
+        if (den == 0).any():
+            raise ValueError("a bootstrap replicate drew only subjects that one seed never "
+                             "tested; the seeds do not share their test subjects")
+        stats += sums[pick].sum(axis=1) / den
+    stats /= len(parts)
+    return float(np.percentile(stats, 2.5)), float(np.percentile(stats, 97.5))
+
+
 def mcnemar_exact(b, c):
     """Two-sided exact McNemar p on discordant counts b (A right, B wrong), c.
 
@@ -127,14 +158,13 @@ def main():
     for gkey in sorted(groups, key=lambda k: tuple(str(v) for v in k)):
         g = groups[gkey]
         policy, guard, mod, arch, cond, perm = gkey
-        accs, los, his, per_subj = [], [], [], []
+        accs, parts, per_subj = [], [], []
         for c in g:
             correct = (c["pred"] == c["truth"]).astype(float)
-            lo, hi = cluster_boot(correct, c["subj"],
-                                  boot_rng(args.seed, gkey + (c["meta"]["seed"],)),
-                                  args.boot)
-            accs.append(correct.mean()); los.append(lo); his.append(hi)
+            accs.append(correct.mean())
+            parts.append((correct, c["subj"]))
             per_subj.append(np.mean([correct[c["subj"] == s].mean() for s in np.unique(c["subj"])]))
+        lo, hi = joint_cluster_boot(parts, boot_rng(args.seed, gkey), args.boot)
         m = g[0]["meta"]
         rec = dict(policy=policy, guard=guard, modality=mod, arch=arch, condition=cond,
                    bits=m.get("bits", 16), frames=m.get("frames", 1),
@@ -143,7 +173,7 @@ def main():
                    eligibility=m.get("eligibility", "cues"),
                    base_condition=m["condition"], permuted=perm, n_seeds=len(g),
                    frame_acc_mean=float(np.mean(accs)), frame_acc_sd=float(np.std(accs)),
-                   subj_ci_lo_mean=float(np.mean(los)), subj_ci_hi_mean=float(np.mean(his)),
+                   subj_ci_lo=lo, subj_ci_hi=hi,
                    per_subject_acc_mean=float(np.mean(per_subj)),
                    chance=m["chance"], majority=m.get("majority_class_rate"))
         out["cells"].append(rec)
@@ -154,10 +184,10 @@ def main():
         # this study calls a positive result: at R4 there are 28 subjects, so a
         # frame-level number several points above 1/K can still be one lucky
         # subject.
-        flag = " *" if rec["subj_ci_lo_mean"] > (m.get("majority_class_rate") or 0) else ""
+        flag = " *" if rec["subj_ci_lo"] > (m.get("majority_class_rate") or 0) else ""
         print(f"{name:<20s}{mod:<6s}{arch_s:<26s}{cond_s:<28s}{'perm' if perm else '':<5s}{len(g):>2d} "
               f"{100 * rec['frame_acc_mean']:6.2f} ±{100 * rec['frame_acc_sd']:4.2f} "
-              f"[{100 * rec['subj_ci_lo_mean']:6.2f}, {100 * rec['subj_ci_hi_mean']:6.2f}]"
+              f"[{100 * rec['subj_ci_lo']:6.2f}, {100 * rec['subj_ci_hi']:6.2f}]"
               f"{100 * rec['per_subject_acc_mean']:9.2f} "
               f"{100 * m['chance']:5.2f}% {100 * (m.get('majority_class_rate') or 0):5.2f}%{flag}")
 
@@ -212,10 +242,10 @@ def main():
     # ---- 3. paired mask-condition vs full, same modality/seed, identical rows --
     print("\nPaired condition contrast vs `full` (same policy, modality, arch, seed; identical test frames):\n")
     hdr = (f"{'policy':<22s}{'mod':<6s}{'condition':<11s}{'n':>2s} {'cond':>7s} {'full':>7s} "
-           f"{'cond-full':>10s} {'subj-boot 95% CI (mean over seeds)':>36s} {'McNemar p (median)':>19s}")
+           f"{'cond-full':>10s} {'subj-boot 95% CI (joint over seeds)':>36s} {'McNemar p (median)':>19s}")
     print(hdr)
     print("-" * len(hdr))
-    cond_rows = {}
+    cond_rows, cond_parts = {}, {}
     for key in sorted(cells):
         policy, guard, mod, arch, cond, perm, seed = key
         meta = cells[key]["meta"]
@@ -239,16 +269,26 @@ def main():
                    bits=meta.get("bits", 16), ci=[lo, hi], mcnemar_p=mcnemar_exact(b, c))
         out.setdefault("conditions", []).append(rec)
         cond_rows.setdefault((policy, guard, mod, arch, cond), []).append(rec)
+        cond_parts.setdefault((policy, guard, mod, arch, cond), []).append((diff, C["subj"]))
     for (policy, guard, mod, arch, cond), rs in sorted(cond_rows.items()):
         name = policy + (f"g{guard}" if guard is not None else "")
         d = np.array([r["diff"] for r in rs]) * 100
-        lo = np.mean([r["ci"][0] for r in rs]) * 100; hi = np.mean([r["ci"][1] for r in rs]) * 100
+        gkey = (policy, guard, mod, arch, cond)
+        glo, ghi = joint_cluster_boot(cond_parts[gkey], boot_rng(args.seed, ("condjoint",) + gkey),
+                                      args.boot)
+        out.setdefault("condition_contrasts", []).append(dict(
+            policy=policy, guard=guard, modality=mod, arch=arch, condition=cond, n_seeds=len(rs),
+            cond_acc=float(np.mean([r["cond_acc"] for r in rs])),
+            full_acc=float(np.mean([r["full_acc"] for r in rs])),
+            diff=float(np.mean([r["diff"] for r in rs])), ci=[glo, ghi]))
+        lo, hi = glo * 100, ghi * 100
         print(f"{name:<22s}{mod:<6s}{cond:<28s}{len(rs):>2d} "
               f"{100 * np.mean([r['cond_acc'] for r in rs]):6.2f}% {100 * np.mean([r['full_acc'] for r in rs]):6.2f}% "
               f"{d.mean():+9.2f}  {'':>8s}[{lo:+6.2f}, {hi:+6.2f}] {'':>8s}"
               f"{np.median([r['mcnemar_p'] for r in rs]):10.2e}")
 
-    print("\nCI = 95 % percentile bootstrap resampling SUBJECTS (n = k_test), mean over seeds.")
+    print("\nCI = 95 % percentile bootstrap over SUBJECTS (n = k_test). Each replicate resamples")
+    print("  the subjects once for all seeds and averages the seeds, except in the per-seed rows.")
     print("* marks cells whose CI lower bound clears the majority-class rate -- the only")
     print("  cells this study reports as a positive identification result.")
     print("McNemar = exact two-sided binomial on the discordant frames of one seed; frames")

@@ -31,7 +31,7 @@ import numpy as np
 
 from hiride_data import load_manifest, make_split, block_train_counts, eligible_mask
 from hiride_metric import BASE_METRIC, SHAPE_PREFIXES
-from hiride_stats import cluster_boot, boot_rng
+from hiride_stats import joint_cluster_boot, boot_rng
 
 LADDER = [("R0_frame_random", {}), ("R1_block", dict(guard=150)),
           ("R3_cross_recording", {}), ("R4_cross_session", {}),
@@ -288,38 +288,33 @@ def main():
 
         te_subj = np.asarray(man["subject"][te], dtype=str)
         for sname, cols in SETS.items():
-            accs, pers, los, his = [], [], [], []
+            accs, pers, parts = [], [], []
             for s in range(args.seeds):
                 a, p, imp, pred = fit_eval(Xall[tr][:, cols], ytr, Xall[te][:, cols], yte, s)
                 accs.append(a); pers.append(p)
-                # Subject-cluster CI per seed, mean of bounds over seeds --
-                # exactly hiride_stats.py's convention for the CNN cells, with
-                # the interval's RNG keyed on the quantity's own identity so it
-                # cannot depend on processing order (13.7).
-                lo, hi = cluster_boot((pred == yte).astype(float), te_subj,
-                                      boot_rng(args.boot_seed,
-                                               ("mfloor", pol, sname, s,
-                                                args.eligibility,
-                                                args.test_eligibility)),
-                                      args.boot)
-                los.append(lo); his.append(hi)
+                parts.append(((pred == yte).astype(float), te_subj))
+            lo, hi = joint_cluster_boot(parts, boot_rng(args.boot_seed,
+                                                        ("mfloor", pol, sname,
+                                                         args.eligibility,
+                                                         args.test_eligibility)),
+                                        args.boot)
             nulls = []
             for d in range(args.perm_draws):
                 rng = np.random.default_rng(5000 + d)
                 a, _, _, _ = fit_eval(Xall[tr][:, cols], rng.permutation(ytr),
                                       Xall[te][:, cols], yte, d)
                 nulls.append(a)
-            flag = " *" if np.mean(los) > maj else ""
+            flag = " *" if lo > maj else ""
             print(f"{pol:<20s}{sname:<17s}{args.seeds:>2d}"
                   f"{100 * np.mean(accs):8.2f}%{100 * np.mean(pers):9.2f}%"
                   f"{100 * np.mean(nulls):7.2f}%{100 / len(classes):6.2f}%"
                   f"{100 * maj:9.2f}%{len(tr):9d}"
-                  f"   [{100 * np.mean(los):5.2f}, {100 * np.mean(his):5.2f}]{flag}")
+                  f"   [{100 * lo:5.2f}, {100 * hi:5.2f}]{flag}")
             report[f"{pol}|{sname}"] = dict(
                 policy=pol, feature_set=sname, n_features=len(cols),
                 acc=float(np.mean(accs)), acc_sd=float(np.std(accs)),
                 per_subject=float(np.mean(pers)), null=float(np.mean(nulls)),
-                subj_ci_lo=float(np.mean(los)), subj_ci_hi=float(np.mean(his)),
+                subj_ci_lo=lo, subj_ci_hi=hi,
                 boot=args.boot, chance=1.0 / len(classes), majority=maj,
                 n_train=int(len(tr)), n_test=int(len(te)))
         # which metric features carry it

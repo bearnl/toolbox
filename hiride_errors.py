@@ -210,7 +210,8 @@ def main():
           f"{'gated' if args.full_body else 'ungated'}  {len(cells)} seeds  decision rule {args.agg} ===")
 
     rng = np.random.default_rng(args.seed)
-    acc = {m: {rule: {str(w): [] for w in W} for rule in ("geo", "mean")} for m in ("cnn", "metric", "geo")}
+    acc = {m: {rule: {str(w): [] for w in W} for rule in ("geo", "mean", "plurality")}
+           for m in ("cnn", "metric", "geo")}
     ndec = {str(w): [] for w in W}
     consistency = {m: [] for m in ("cnn", "metric", "geo")}
     lags = {m: [] for m in ("cnn", "metric")}
@@ -253,6 +254,7 @@ def main():
                 rows = window_rows(P, truth, rec, frame, w, args.agg)
                 acc[m]["geo"][str(w)].append(float(np.mean([r["d_geo"] == r["truth"] for r in rows])))
                 acc[m]["mean"][str(w)].append(float(np.mean([r["d_mean"] == r["truth"] for r in rows])))
+                acc[m]["plurality"][str(w)].append(float(np.mean([r["modal"] == r["truth"] for r in rows])))
                 if m == "cnn":
                     ndec[str(w)].append(len(rows))
                 if w == args.window:
@@ -305,9 +307,12 @@ def main():
     print("\nlag-k agreement of WRONG per-frame decisions within a recording, P(a_t+k = a_t | a_t wrong):")
     for m in ("cnn", "metric"):
         print(f"  {m:<7s}" + "  ".join(f"k={k}: {np.nanmean([l[k] for l in lags[m]]):.2f}" for k in ("1", "5", "10")))
-    print("\ni.i.d. ceiling (plurality of W frames drawn independently from the frame-level confusion rows):")
+    print("\ni.i.d. ceiling (plurality of W frames drawn independently from the frame-level confusion rows),")
+    print("against the plurality of the W observed frames (same rule) and the window decision under --agg:")
     for m in ("cnn", "metric"):
-        print(f"  {m:<7s}" + "  ".join(f"W={w}: {100 * np.mean([c[str(w)] for c in ceiling[m]]):.1f}% (measured {100 * np.mean(acc[m][args.agg][str(w)]):.1f}%)"
+        print(f"  {m:<7s}" + "  ".join(f"W={w}: {100 * np.mean([c[str(w)] for c in ceiling[m]]):.1f}% "
+                                        f"(observed plurality {100 * np.mean(acc[m]['plurality'][str(w)]):.1f}%, "
+                                        f"{args.agg} rule {100 * np.mean(acc[m][args.agg][str(w)]):.1f}%)"
                                         for w in W if w > 0))
     print("\nmodal confuser stable across >=80% of seeds:")
     for m in ("cnn", "metric"):
